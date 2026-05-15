@@ -197,5 +197,26 @@
     "installSelected": "Install Selected ({{count}})",
     "installing": "Installing...",
     "notNow": "Not Now"
+  },
+  "sync": {
+    "title": "Sync",
+    "configTitle": "Configure Sync",
+    "configDesc": "Set up a Git repository to sync your Skills, MCP configs, and Hooks across machines.",
+    "configSaved": "Sync configuration saved",
+    "configure": "Configure",
+    "repoUrl": "Repository URL",
+    "branch": "Branch",
+    "token": "Personal Access Token",
+    "tokenSaved": "saved in keychain",
+    "tokenPlaceholder": "ghp_xxxxxxxxxxxx",
+    "tokenPlaceholderSaved": "Leave empty to keep existing token",
+    "include": "Include in sync",
+    "testConnection": "Test Connection",
+    "save": "Save",
+    "pull": "Pull from Git",
+    "push": "Push to Git",
+    "pulling": "Pulling",
+    "pushing": "Pushing",
+    "lastSync": "Last sync"
   }
 }

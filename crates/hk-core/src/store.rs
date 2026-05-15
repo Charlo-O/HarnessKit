@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::models::*;
 
 /// Latest schema version supported by this binary.
-const LATEST_SCHEMA_VERSION: i64 = 4;
+const LATEST_SCHEMA_VERSION: i64 = 5;
 
 /// One row of `custom_config_paths`: (id, path, label, category, scope_json).
 /// `scope_json` is `None` for legacy rows that predate v4 schema migration.
@@ -141,6 +141,7 @@ impl Store {
         if current_version < 2 { self.migrate_v2()?; }
         if current_version < 3 { self.migrate_v3()?; }
         if current_version < 4 { self.migrate_v4()?; }
+        if current_version < 5 { self.migrate_v5()?; }
 
         // Update schema version to latest
         if current_version < LATEST_SCHEMA_VERSION {
@@ -257,6 +258,25 @@ impl Store {
         self.migrate_add_column(
             "ALTER TABLE custom_config_paths ADD COLUMN scope_json TEXT",
         );
+        Ok(())
+    }
+
+    /// Schema v5: sync_config table for Git-based sync of skills, MCP, and hooks.
+    /// Single-row table (id=1). Auth tokens are stored in OS keychain, not here.
+    fn migrate_v5(&self) -> Result<(), HkError> {
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS sync_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                repo_url TEXT NOT NULL DEFAULT '',
+                branch TEXT NOT NULL DEFAULT 'main',
+                auth_type TEXT NOT NULL DEFAULT 'token',
+                sync_skills INTEGER NOT NULL DEFAULT 1,
+                sync_mcp INTEGER NOT NULL DEFAULT 0,
+                sync_hooks INTEGER NOT NULL DEFAULT 0,
+                last_sync_at TEXT,
+                last_sync_summary TEXT
+            )",
+        )?;
         Ok(())
     }
 
@@ -1203,6 +1223,71 @@ impl Store {
             install_meta,
             scope,
         })
+    }
+
+    // --- Sync config ---
+
+    /// Read the single-row sync_config (id=1). Returns Ok(None) if no config saved yet.
+    pub fn get_sync_config(&self) -> Result<Option<SyncConfig>, HkError> {
+        let result = self.conn.query_row(
+            "SELECT repo_url, branch, auth_type, sync_skills, sync_mcp, sync_hooks,
+                    last_sync_at, last_sync_summary
+             FROM sync_config WHERE id = 1",
+            [],
+            |row| {
+                let last_sync_at_str: Option<String> = row.get(6)?;
+                Ok(SyncConfig {
+                    repo_url: row.get(0)?,
+                    branch: row.get(1)?,
+                    auth_type: row.get(2)?,
+                    sync_skills: row.get::<_, i64>(3)? != 0,
+                    sync_mcp: row.get::<_, i64>(4)? != 0,
+                    sync_hooks: row.get::<_, i64>(5)? != 0,
+                    last_sync_at: last_sync_at_str.and_then(|s| {
+                        DateTime::parse_from_rfc3339(&s)
+                            .ok()
+                            .map(|d| d.with_timezone(&Utc))
+                    }),
+                    last_sync_summary: row.get(7)?,
+                })
+            },
+        ).optional()?;
+        // Treat empty repo_url as "not configured yet"
+        Ok(result.filter(|c| !c.repo_url.is_empty()))
+    }
+
+    /// Upsert the sync_config row (id=1). Does not touch `last_sync_at` /
+    /// `last_sync_summary` — those are updated by `record_sync_summary`.
+    pub fn save_sync_config(&self, config: &SyncConfig) -> Result<(), HkError> {
+        self.conn.execute(
+            "INSERT INTO sync_config (id, repo_url, branch, auth_type, sync_skills, sync_mcp, sync_hooks)
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET
+                repo_url = excluded.repo_url,
+                branch = excluded.branch,
+                auth_type = excluded.auth_type,
+                sync_skills = excluded.sync_skills,
+                sync_mcp = excluded.sync_mcp,
+                sync_hooks = excluded.sync_hooks",
+            params![
+                config.repo_url,
+                config.branch,
+                config.auth_type,
+                config.sync_skills as i64,
+                config.sync_mcp as i64,
+                config.sync_hooks as i64,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Update only the last-sync metadata fields. Called after a successful push/pull.
+    pub fn record_sync_summary(&self, summary: &str) -> Result<(), HkError> {
+        self.conn.execute(
+            "UPDATE sync_config SET last_sync_at = ?1, last_sync_summary = ?2 WHERE id = 1",
+            params![Utc::now().to_rfc3339(), summary],
+        )?;
+        Ok(())
     }
 }
 

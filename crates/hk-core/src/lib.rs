@@ -10,5 +10,6 @@ pub mod sanitize;
 pub mod scanner;
 pub mod service;
 pub mod store;
+pub mod sync;
 
 pub use error::HkError;

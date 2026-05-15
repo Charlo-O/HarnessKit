@@ -84,6 +84,12 @@ fn main() {
             commands::update_custom_config_path,
             commands::remove_custom_config_path,
             icon::set_app_icon,
+            commands::sync_get_config,
+            commands::sync_has_token,
+            commands::sync_save_config,
+            commands::sync_test_connection,
+            commands::sync_push,
+            commands::sync_pull,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

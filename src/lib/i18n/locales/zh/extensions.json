@@ -197,5 +197,26 @@
     "installSelected": "安装所选 ({{count}})",
     "installing": "安装中...",
     "notNow": "暂不"
+  },
+  "sync": {
+    "title": "同步",
+    "configTitle": "配置同步",
+    "configDesc": "设置 Git 仓库以在多台机器间同步 Skills、MCP 配置和 Hooks。",
+    "configSaved": "同步配置已保存",
+    "configure": "配置",
+    "repoUrl": "仓库 URL",
+    "branch": "分支",
+    "token": "Personal Access Token",
+    "tokenSaved": "已保存到系统钥匙串",
+    "tokenPlaceholder": "ghp_xxxxxxxxxxxx",
+    "tokenPlaceholderSaved": "留空则保留已有 Token",
+    "include": "同步范围",
+    "testConnection": "测试连接",
+    "save": "保存",
+    "pull": "从 Git 拉取",
+    "push": "推送到 Git",
+    "pulling": "拉取中",
+    "pushing": "推送中",
+    "lastSync": "上次同步"
   }
 }

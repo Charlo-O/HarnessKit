@@ -458,6 +458,49 @@ pub struct ExtensionCounts {
     pub cli: usize,
 }
 
+// --- Sync ---
+
+/// Configuration for Git-based sync of skills, MCP, and hooks.
+/// Single instance per HarnessKit install (stored as id=1 in sync_config table).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SyncConfig {
+    pub repo_url: String,
+    pub branch: String,
+    /// Auth type: currently only "token" supported.
+    pub auth_type: String,
+    pub sync_skills: bool,
+    pub sync_mcp: bool,
+    pub sync_hooks: bool,
+    pub last_sync_at: Option<DateTime<Utc>>,
+    pub last_sync_summary: Option<String>,
+}
+
+impl Default for SyncConfig {
+    fn default() -> Self {
+        Self {
+            repo_url: String::new(),
+            branch: "main".to_string(),
+            auth_type: "token".to_string(),
+            sync_skills: true,
+            sync_mcp: false,
+            sync_hooks: false,
+            last_sync_at: None,
+            last_sync_summary: None,
+        }
+    }
+}
+
+/// Result of a push or pull operation.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SyncSummary {
+    pub direction: String, // "push" or "pull"
+    pub skills_count: usize,
+    pub mcp_files_count: usize,
+    pub hook_files_count: usize,
+    pub commit_hash: Option<String>,
+    pub message: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

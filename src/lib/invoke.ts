@@ -15,6 +15,8 @@ import type {
   Project,
   ScanResult,
   SkillAuditInfo,
+  SyncConfig,
+  SyncSummary,
   UpdateStatus,
 } from "./types";
 
@@ -328,5 +330,38 @@ export const api = {
 
   setAppIcon(name: string): Promise<void> {
     return transport("set_app_icon", { name });
+  },
+
+  // --- Sync ---
+
+  syncGetConfig(): Promise<SyncConfig | null> {
+    return transport("sync_get_config");
+  },
+
+  syncHasToken(): Promise<boolean> {
+    return transport("sync_has_token");
+  },
+
+  syncSaveConfig(config: {
+    repoUrl: string;
+    branch: string;
+    syncSkills: boolean;
+    syncMcp: boolean;
+    syncHooks: boolean;
+    token?: string;
+  }): Promise<void> {
+    return transport("sync_save_config", { config });
+  },
+
+  syncTestConnection(repoUrl: string, token: string): Promise<string> {
+    return transport("sync_test_connection", { repoUrl, token });
+  },
+
+  syncPush(): Promise<SyncSummary> {
+    return transport("sync_push");
+  },
+
+  syncPull(): Promise<SyncSummary> {
+    return transport("sync_pull");
   },
 };

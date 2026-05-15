@@ -6,6 +6,7 @@ pub mod install;
 pub mod marketplace;
 pub mod projects;
 pub mod settings;
+pub mod sync;
 
 // Re-export shared types that appear in Tauri command signatures.
 // The Tauri proc macro requires these types to be publicly reachable.
@@ -20,6 +21,7 @@ pub use install::*;
 pub use marketplace::*;
 pub use projects::*;
 pub use settings::*;
+pub use sync::*;
 
 use hk_core::adapter;
 use hk_core::store::Store;

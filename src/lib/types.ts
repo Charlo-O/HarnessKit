@@ -407,6 +407,28 @@ export interface DiscoveredProject {
   path: string;
 }
 
+// --- Sync ---
+
+export interface SyncConfig {
+  repo_url: string;
+  branch: string;
+  auth_type: string;
+  sync_skills: boolean;
+  sync_mcp: boolean;
+  sync_hooks: boolean;
+  last_sync_at: string | null;
+  last_sync_summary: string | null;
+}
+
+export interface SyncSummary {
+  direction: string;
+  skills_count: number;
+  mcp_files_count: number;
+  hook_files_count: number;
+  commit_hash: string | null;
+  message: string;
+}
+
 export function trustTier(score: number): TrustTier {
   if (score >= 80) return "Safe";
   if (score >= 60) return "LowRisk";
