@@ -105,3 +105,17 @@ pub async fn sync_pull(state: State<'_, AppState>) -> Result<SyncSummary, HkErro
     .await
     .map_err(|e| HkError::Internal(e.to_string()))?
 }
+
+#[tauri::command]
+pub async fn sync_to_agents(
+    state: State<'_, AppState>,
+    items: Vec<AgentSyncItem>,
+) -> Result<AgentSyncSummary, HkError> {
+    let store = state.store.clone();
+    let adapters = state.adapters.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        hk_core::service::sync_to_agents(&store, &adapters, &items)
+    })
+    .await
+    .map_err(|e| HkError::Internal(e.to_string()))?
+}

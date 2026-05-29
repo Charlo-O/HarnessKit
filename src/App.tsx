@@ -16,6 +16,7 @@ import ExtensionsPage from "./pages/extensions";
 import MarketplacePage from "./pages/marketplace";
 import OverviewPage from "./pages/overview";
 import SettingsPage from "./pages/settings";
+import SyncPage from "./pages/sync";
 import { useAuditStore } from "./stores/audit-store";
 import { useExtensionStore } from "./stores/extension-store";
 import { resolveMode, useUIStore } from "./stores/ui-store";
@@ -161,6 +162,7 @@ export default function App() {
               <Route index element={<OverviewPage />} />
               <Route path="agents" element={<AgentsPage />} />
               <Route path="extensions" element={<ExtensionsPage />} />
+              <Route path="sync" element={<SyncPage />} />
               <Route path="marketplace" element={<MarketplacePage />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="settings" element={<SettingsPage />} />

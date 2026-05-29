@@ -429,6 +429,30 @@ export interface SyncSummary {
   message: string;
 }
 
+export interface AgentSyncItem {
+  extension_id: string;
+  target_agents: string[];
+}
+
+export type AgentSyncStatus = "deployed" | "skipped" | "failed";
+
+export interface AgentSyncResult {
+  extension_id: string;
+  extension_name: string;
+  kind: ExtensionKind;
+  target_agent: string;
+  status: AgentSyncStatus;
+  message: string;
+}
+
+export interface AgentSyncSummary {
+  total: number;
+  deployed: number;
+  skipped: number;
+  failed: number;
+  results: AgentSyncResult[];
+}
+
 export function trustTier(score: number): TrustTier {
   if (score >= 80) return "Safe";
   if (score >= 60) return "LowRisk";

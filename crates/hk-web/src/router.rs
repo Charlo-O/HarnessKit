@@ -91,6 +91,14 @@ pub fn build_router(state: WebState) -> Router {
         .route("/api/get_all_packs", post(handlers::settings::get_all_packs))
         .route("/api/toggle_by_pack", post(handlers::settings::toggle_by_pack))
         .route("/api/read_config_file_preview", post(handlers::settings::read_config_file_preview))
+        // Sync
+        .route("/api/sync_get_config", post(handlers::sync::sync_get_config))
+        .route("/api/sync_has_token", post(handlers::sync::sync_has_token))
+        .route("/api/sync_save_config", post(handlers::sync::sync_save_config))
+        .route("/api/sync_test_connection", post(handlers::sync::sync_test_connection))
+        .route("/api/sync_push", post(handlers::sync::sync_push))
+        .route("/api/sync_pull", post(handlers::sync::sync_pull))
+        .route("/api/sync_to_agents", post(handlers::sync::sync_to_agents))
         // Agents
         .route("/api/list_agents", post(handlers::agents::list_agents))
         .route("/api/set_agent_enabled", post(handlers::agents::set_agent_enabled))

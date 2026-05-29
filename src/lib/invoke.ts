@@ -2,6 +2,8 @@ import { transport } from "./transport";
 import type {
   AgentDetail,
   AgentInfo,
+  AgentSyncItem,
+  AgentSyncSummary,
   AuditResult,
   CheckUpdatesResult,
   ConfigScope,
@@ -363,5 +365,9 @@ export const api = {
 
   syncPull(): Promise<SyncSummary> {
     return transport("sync_pull");
+  },
+
+  syncToAgents(items: AgentSyncItem[]): Promise<AgentSyncSummary> {
+    return transport("sync_to_agents", { items });
   },
 };

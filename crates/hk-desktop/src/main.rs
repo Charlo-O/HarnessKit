@@ -90,6 +90,7 @@ fn main() {
             commands::sync_test_connection,
             commands::sync_push,
             commands::sync_pull,
+            commands::sync_to_agents,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

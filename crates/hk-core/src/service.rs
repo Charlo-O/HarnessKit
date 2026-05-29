@@ -954,7 +954,177 @@ pub fn get_extension_content(
     }
 }
 
-/// Cross-agent deploy: copy a Skill / MCP / Hook / CLI from its source agent
+fn safe_plugin_dir_name(name: &str) -> String {
+    let sanitized = deployer::sanitize_mcp_name(name);
+    if sanitized.is_empty() {
+        "plugin".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn find_plugin_source_path(
+    ext: &Extension,
+    adapters: &[Box<dyn AgentAdapter>],
+) -> Option<std::path::PathBuf> {
+    if let Some(path) = ext.source_path.as_ref().map(std::path::PathBuf::from)
+        && path.exists()
+    {
+        return Some(path);
+    }
+
+    for adapter in adapters {
+        if !ext.agents.contains(&adapter.name().to_string()) {
+            continue;
+        }
+        for plugin in adapter.read_plugins() {
+            let id_name = format!("{}:{}", plugin.name, plugin.source);
+            if scanner::stable_id_for(&id_name, "plugin", adapter.name()) == ext.id
+                && let Some(path) = plugin.path
+                && path.exists()
+            {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
+fn plugin_deploy_root(
+    target_adapter: &dyn AgentAdapter,
+    ext: &Extension,
+    source_path: &std::path::Path,
+) -> Result<std::path::PathBuf, HkError> {
+    let name = safe_plugin_dir_name(&ext.name);
+    let base_dir = target_adapter
+        .plugin_dirs()
+        .into_iter()
+        .next()
+        .ok_or_else(|| {
+            HkError::Internal(format!(
+                "No plugin directory for agent '{}'",
+                target_adapter.name()
+            ))
+        })?;
+
+    match target_adapter.name() {
+        "codex" => Ok(base_dir.join("cache").join("local").join(name).join("0.0.0")),
+        "cursor" => Ok(base_dir.join("local").join(name)),
+        "gemini" => Ok(base_dir.join(name)),
+        "claude" => Ok(base_dir.join("local").join(name)),
+        "copilot" => Ok(target_adapter
+            .base_dir()
+            .join("installed-plugins")
+            .join("local")
+            .join(name)),
+        "antigravity" | "windsurf" => Err(HkError::Internal(format!(
+            "{} does not expose a plugin install format yet",
+            target_adapter.name()
+        ))),
+        "opencode" => {
+            if source_path.is_file() {
+                Ok(base_dir)
+            } else {
+                Err(HkError::Internal(
+                    "OpenCode plugins are single JavaScript or TypeScript files".into(),
+                ))
+            }
+        }
+        _ => Ok(base_dir.join(name)),
+    }
+}
+
+fn write_manifest_if_missing(
+    path: &std::path::Path,
+    name: &str,
+    extra: Option<serde_json::Value>,
+) -> Result<(), HkError> {
+    if path.exists() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut manifest = serde_json::json!({ "name": name });
+    if let Some(extra) = extra
+        && let (Some(dst), Some(src)) = (manifest.as_object_mut(), extra.as_object())
+    {
+        for (key, value) in src {
+            dst.insert(key.clone(), value.clone());
+        }
+    }
+    std::fs::write(path, serde_json::to_vec_pretty(&manifest)?)?;
+    Ok(())
+}
+
+fn ensure_claude_plugin_registry(
+    target_adapter: &dyn AgentAdapter,
+    ext: &Extension,
+    target_root: &std::path::Path,
+) -> Result<(), HkError> {
+    let registry_path = target_adapter
+        .base_dir()
+        .join("plugins")
+        .join("installed_plugins.json");
+    if let Some(parent) = registry_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut registry = std::fs::read_to_string(&registry_path)
+        .ok()
+        .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
+        .unwrap_or_else(|| serde_json::json!({ "plugins": {} }));
+
+    if !registry.get("plugins").is_some_and(|v| v.is_object()) {
+        registry["plugins"] = serde_json::json!({});
+    }
+
+    let key = format!("{}@local", ext.name);
+    let now = chrono::Utc::now().to_rfc3339();
+    registry["plugins"][&key] = serde_json::json!([{
+        "installPath": target_root.join("0.0.0").to_string_lossy(),
+        "installedAt": now,
+        "lastUpdated": now
+    }]);
+    std::fs::write(&registry_path, serde_json::to_vec_pretty(&registry)?)?;
+    deployer::set_plugin_enabled(&target_adapter.plugin_config_path(), &key, true)?;
+    Ok(())
+}
+
+fn ensure_plugin_visible(
+    target_adapter: &dyn AgentAdapter,
+    ext: &Extension,
+    target_root: &std::path::Path,
+) -> Result<(), HkError> {
+    match target_adapter.name() {
+        "codex" => write_manifest_if_missing(
+            &target_root.join(".codex-plugin").join("plugin.json"),
+            &ext.name,
+            None,
+        ),
+        "cursor" => write_manifest_if_missing(
+            &target_root.join(".cursor-plugin").join("plugin.json"),
+            &ext.name,
+            None,
+        ),
+        "gemini" => write_manifest_if_missing(
+            &target_root.join("gemini-extension.json"),
+            &ext.name,
+            None,
+        ),
+        "copilot" => write_manifest_if_missing(&target_root.join("plugin.json"), &ext.name, None),
+        "claude" => {
+            write_manifest_if_missing(
+                &target_root.join(".claude-plugin").join("plugin.json"),
+                &ext.name,
+                None,
+            )?;
+            ensure_claude_plugin_registry(target_adapter, ext, target_root)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Cross-agent deploy: copy a Skill / MCP / Hook / CLI / Plugin from its source agent
 /// into `target_agent`. Returns a human-readable identifier of what was
 /// deployed (skill name, MCP server name, or `event:command` for hooks) so
 /// the UI can show the result. The wrapper is responsible for any post-deploy
@@ -1136,11 +1306,116 @@ pub fn install_to_agent(
             let deployed_name = deployer::deploy_skill(&source_path, &target_dir)?;
             Ok(deployed_name)
         }
-        other => Err(HkError::Internal(format!(
-            "Cross-agent deploy not supported for '{}' extensions",
-            other.as_str()
-        ))),
+        ExtensionKind::Plugin => {
+            let source_path = find_plugin_source_path(&ext, adapters)
+                .ok_or_else(|| HkError::Internal("Could not find source plugin files".into()))?;
+            let target_root = plugin_deploy_root(target_adapter.as_ref(), &ext, &source_path)?;
+            deployer::deploy_plugin(&source_path, &target_root)?;
+            ensure_plugin_visible(target_adapter.as_ref(), &ext, &target_root)?;
+            Ok(ext.name)
+        }
     }
+}
+
+pub fn sync_to_agents(
+    store: &Mutex<Store>,
+    adapters: &[Box<dyn AgentAdapter>],
+    items: &[AgentSyncItem],
+) -> Result<AgentSyncSummary, HkError> {
+    let mut summary = AgentSyncSummary::default();
+
+    for item in items {
+        let ext = {
+            let store = store.lock();
+            store.get_extension(&item.extension_id)?
+        };
+
+        let Some(ext) = ext else {
+            for target_agent in &item.target_agents {
+                summary.total += 1;
+                summary.failed += 1;
+                summary.results.push(AgentSyncResult {
+                    extension_id: item.extension_id.clone(),
+                    extension_name: String::new(),
+                    kind: ExtensionKind::Skill,
+                    target_agent: target_agent.clone(),
+                    status: "failed".into(),
+                    message: "Extension not found".into(),
+                });
+            }
+            continue;
+        };
+
+        if !matches!(
+            ext.kind,
+            ExtensionKind::Skill | ExtensionKind::Mcp | ExtensionKind::Plugin
+        ) {
+            for target_agent in &item.target_agents {
+                summary.total += 1;
+                summary.skipped += 1;
+                summary.results.push(AgentSyncResult {
+                    extension_id: ext.id.clone(),
+                    extension_name: ext.name.clone(),
+                    kind: ext.kind,
+                    target_agent: target_agent.clone(),
+                    status: "skipped".into(),
+                    message: format!("{} cannot be synced to IDEs", ext.kind.as_str()),
+                });
+            }
+            continue;
+        }
+
+        for target_agent in &item.target_agents {
+            summary.total += 1;
+
+            if ext.agents.contains(target_agent) {
+                summary.skipped += 1;
+                summary.results.push(AgentSyncResult {
+                    extension_id: ext.id.clone(),
+                    extension_name: ext.name.clone(),
+                    kind: ext.kind,
+                    target_agent: target_agent.clone(),
+                    status: "skipped".into(),
+                    message: "Already installed".into(),
+                });
+                continue;
+            }
+
+            match install_to_agent(store, adapters, &ext.id, target_agent) {
+                Ok(message) => {
+                    summary.deployed += 1;
+                    summary.results.push(AgentSyncResult {
+                        extension_id: ext.id.clone(),
+                        extension_name: ext.name.clone(),
+                        kind: ext.kind,
+                        target_agent: target_agent.clone(),
+                        status: "deployed".into(),
+                        message,
+                    });
+                }
+                Err(err) => {
+                    summary.failed += 1;
+                    summary.results.push(AgentSyncResult {
+                        extension_id: ext.id.clone(),
+                        extension_name: ext.name.clone(),
+                        kind: ext.kind,
+                        target_agent: target_agent.clone(),
+                        status: "failed".into(),
+                        message: err.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    if summary.deployed > 0 {
+        let store = store.lock();
+        let projects = store.list_project_tuples();
+        let scanned = scanner::scan_all(adapters, &projects);
+        store.sync_extensions(&scanned)?;
+    }
+
+    Ok(summary)
 }
 
 #[cfg(test)]

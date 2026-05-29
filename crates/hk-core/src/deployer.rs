@@ -27,6 +27,28 @@ pub fn deploy_skill(source_path: &Path, target_skill_dir: &Path) -> Result<Strin
     }
 }
 
+pub fn deploy_plugin(source_path: &Path, target_plugin_root: &Path) -> Result<String, HkError> {
+    std::fs::create_dir_all(target_plugin_root)?;
+    if source_path.is_dir() {
+        copy_dir_recursive(source_path, target_plugin_root)?;
+        let dir_name = source_path
+            .file_name()
+            .ok_or_else(|| HkError::Validation("Invalid source path".into()))?
+            .to_string_lossy()
+            .to_string();
+        Ok(dir_name)
+    } else {
+        let file_name = source_path
+            .file_name()
+            .ok_or_else(|| HkError::Validation("Invalid source path".into()))?
+            .to_string_lossy()
+            .to_string();
+        let dest = target_plugin_root.join(&file_name);
+        std::fs::copy(source_path, &dest)?;
+        Ok(file_name)
+    }
+}
+
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), HkError> {
     std::fs::create_dir_all(dst)?;
     for entry in std::fs::read_dir(src)?.flatten() {

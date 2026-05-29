@@ -501,6 +501,34 @@ pub struct SyncSummary {
     pub message: String,
 }
 
+/// One selected extension plus the IDEs/agents it should be copied into.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSyncItem {
+    pub extension_id: String,
+    pub target_agents: Vec<String>,
+}
+
+/// Per target result for the local one-click IDE sync.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSyncResult {
+    pub extension_id: String,
+    pub extension_name: String,
+    pub kind: ExtensionKind,
+    pub target_agent: String,
+    pub status: String,
+    pub message: String,
+}
+
+/// Summary returned by the local one-click IDE sync.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AgentSyncSummary {
+    pub total: usize,
+    pub deployed: usize,
+    pub skipped: usize,
+    pub failed: usize,
+    pub results: Vec<AgentSyncResult>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

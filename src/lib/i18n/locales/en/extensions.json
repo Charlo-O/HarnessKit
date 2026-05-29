@@ -198,8 +198,35 @@
     "installing": "Installing...",
     "notNow": "Not Now"
   },
+  "ideSync": {
+    "title": "Sync to IDEs",
+    "pageDesc": "Copy Skills, MCP servers, and plugins into every detected IDE you choose.",
+    "desc": "Select the content and target IDEs. HarnessKit will copy only the missing installs.",
+    "include": "Content",
+    "targets": "Target IDEs",
+    "items": "{{selected}} / {{total}} selected",
+    "selectAll": "Select all",
+    "clear": "Clear",
+    "noItems": "No Skills, MCP servers, or plugins found.",
+    "noTargets": "No enabled IDEs detected.",
+    "pendingTargets": "{{count}} target(s)",
+    "ready": "{{count}} install(s) ready",
+    "noPending": "Everything selected is already in the selected IDEs.",
+    "syncNow": "Sync {{count}}",
+    "syncing": "Syncing...",
+    "summary": "Done: {{deployed}} copied, {{skipped}} skipped, {{failed}} failed.",
+    "failedTitle": "Failed",
+    "toastSuccess": "Synced {{deployed}} install(s).",
+    "toastPartial": "Synced {{deployed}} install(s), {{failed}} failed.",
+    "kinds": {
+      "skill": "Skills",
+      "mcp": "MCP servers",
+      "plugin": "Plugins"
+    }
+  },
   "sync": {
     "title": "Sync",
+    "gitTitle": "Git Sync",
     "configTitle": "Configure Sync",
     "configDesc": "Set up a Git repository to sync your Skills, MCP configs, and Hooks across machines.",
     "configSaved": "Sync configuration saved",

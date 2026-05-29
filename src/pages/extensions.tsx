@@ -1,4 +1,4 @@
-import { ArrowDownCircle, Package, Plus, RefreshCcw, RefreshCw } from "lucide-react";
+import { ArrowDownCircle, Package, Plus, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -6,7 +6,6 @@ import { ExtensionDetail } from "@/components/extensions/extension-detail";
 import { ExtensionFilters } from "@/components/extensions/extension-filters";
 import { ExtensionTable } from "@/components/extensions/extension-table";
 import { NewSkillsDialog } from "@/components/extensions/new-skills-dialog";
-import { SyncDialog } from "@/components/extensions/sync-dialog";
 import { useScope } from "@/hooks/use-scope";
 import { useAgentStore } from "@/stores/agent-store";
 import { useExtensionStore } from "@/stores/extension-store";
@@ -127,7 +126,6 @@ export default function ExtensionsPage() {
   const installNewRepoSkills = useExtensionStore((s) => s.installNewRepoSkills);
   const grouped = useExtensionStore((s) => s.grouped);
   const [showNewSkills, setShowNewSkills] = useState(false);
-  const [showSync, setShowSync] = useState(false);
   const updatesAvailable = useMemo(() => {
     return grouped().filter((g) =>
       g.instances.some(
@@ -179,13 +177,6 @@ export default function ExtensionsPage() {
             >
               <Plus size={12} />
               {t("page.installNew")}
-            </button>
-            <button
-              onClick={() => setShowSync(!showSync)}
-              className="flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-[background-color,box-shadow] duration-200 hover:bg-accent hover:shadow-md"
-            >
-              <RefreshCcw size={12} />
-              {t("sync.title")}
             </button>
             <button
               onClick={() => {
@@ -285,7 +276,6 @@ export default function ExtensionsPage() {
           )}
         </div>
         <ExtensionFilters />
-        <SyncDialog open={showSync} onClose={() => setShowSync(false)} />
       </div>
 
       {/* Scrollable content */}

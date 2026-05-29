@@ -198,8 +198,35 @@
     "installing": "安装中...",
     "notNow": "暂不"
   },
+  "ideSync": {
+    "title": "同步到 IDE",
+    "pageDesc": "把 Skills、MCP server 和插件复制到你选择的每一个 IDE。",
+    "desc": "选择要同步的内容和目标 IDE，HarnessKit 只会补齐缺失的安装项。",
+    "include": "内容",
+    "targets": "目标 IDE",
+    "items": "已选 {{selected}} / {{total}}",
+    "selectAll": "全选",
+    "clear": "清空",
+    "noItems": "还没有发现 Skills、MCP server 或插件。",
+    "noTargets": "没有检测到已启用的 IDE。",
+    "pendingTargets": "{{count}} 个目标",
+    "ready": "{{count}} 个安装项待同步",
+    "noPending": "所选内容已经在所选 IDE 中。",
+    "syncNow": "同步 {{count}} 项",
+    "syncing": "同步中...",
+    "summary": "完成：复制 {{deployed}} 项，跳过 {{skipped}} 项，失败 {{failed}} 项。",
+    "failedTitle": "失败项",
+    "toastSuccess": "已同步 {{deployed}} 个安装项。",
+    "toastPartial": "已同步 {{deployed}} 个安装项，{{failed}} 个失败。",
+    "kinds": {
+      "skill": "Skills",
+      "mcp": "MCP server",
+      "plugin": "插件"
+    }
+  },
   "sync": {
     "title": "同步",
+    "gitTitle": "Git 同步",
     "configTitle": "配置同步",
     "configDesc": "设置 Git 仓库以在多台机器间同步 Skills、MCP 配置和 Hooks。",
     "configSaved": "同步配置已保存",
