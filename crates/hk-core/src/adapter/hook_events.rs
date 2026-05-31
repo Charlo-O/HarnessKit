@@ -474,12 +474,7 @@ mod tests {
             assert_eq!(to_claude(event), None, "to_claude leaked for '{}'", event);
             assert_eq!(to_gemini(event), None, "to_gemini leaked for '{}'", event);
             assert_eq!(to_cursor(event), None, "to_cursor leaked for '{}'", event);
-            assert_eq!(
-                to_copilot(event),
-                None,
-                "to_copilot leaked for '{}'",
-                event
-            );
+            assert_eq!(to_copilot(event), None, "to_copilot leaked for '{}'", event);
         }
     }
 

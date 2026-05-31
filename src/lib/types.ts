@@ -453,6 +453,56 @@ export interface AgentSyncSummary {
   results: AgentSyncResult[];
 }
 
+export interface AgentSessionRoot {
+  id: string;
+  label: string;
+  path: string;
+  exists: boolean;
+  file_count: number;
+  total_bytes: number;
+  modified_at: string | null;
+  sessions: AgentSessionEntry[];
+}
+
+export interface AgentSessionEntry {
+  id: string;
+  summary: string;
+  path: string;
+  file_name: string;
+  relative_path: string;
+  root_id: string;
+  root_label: string;
+  total_bytes: number;
+  modified_at: string | null;
+}
+
+export interface AgentSessionInfo {
+  agent: string;
+  detected: boolean;
+  roots: AgentSessionRoot[];
+}
+
+export type AgentSessionSyncStatus = "copied" | "skipped" | "failed";
+
+export interface AgentSessionSyncResult {
+  source_agent: string;
+  source_root_id: string;
+  target_agent: string;
+  target_path: string | null;
+  copied_files: number;
+  skipped_files: number;
+  status: AgentSessionSyncStatus;
+  message: string;
+}
+
+export interface AgentSessionSyncSummary {
+  total: number;
+  copied: number;
+  skipped: number;
+  failed: number;
+  results: AgentSessionSyncResult[];
+}
+
 export function trustTier(score: number): TrustTier {
   if (score >= 80) return "Safe";
   if (score >= 60) return "LowRisk";

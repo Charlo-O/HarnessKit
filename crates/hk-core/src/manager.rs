@@ -179,7 +179,12 @@ fn toggle_skill(
     Ok(())
 }
 
-fn toggle_mcp(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<dyn adapter::AgentAdapter>]) -> Result<(), HkError> {
+fn toggle_mcp(
+    ext: &Extension,
+    enabled: bool,
+    store: &Store,
+    adapters: &[Box<dyn adapter::AgentAdapter>],
+) -> Result<(), HkError> {
     for a in adapters {
         if !ext.agents.contains(&a.name().to_string()) {
             continue;
@@ -188,7 +193,9 @@ fn toggle_mcp(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<dyn
         // <project>/<project_mcp_config_relpath>; global entries use the
         // adapter's user-scope path. None means this adapter has no project-
         // level MCP support, so skip it for project-scoped extensions.
-        let Some(config_path) = a.mcp_config_path_for(&ext.scope) else { continue };
+        let Some(config_path) = a.mcp_config_path_for(&ext.scope) else {
+            continue;
+        };
         let format = a.mcp_format();
         if enabled {
             let saved = store.get_disabled_config(&ext.id)?.ok_or_else(|| {
@@ -287,7 +294,12 @@ fn redact_mcp_env(entry: &serde_json::Value) -> serde_json::Value {
     redacted
 }
 
-fn toggle_hook(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<dyn adapter::AgentAdapter>]) -> Result<(), HkError> {
+fn toggle_hook(
+    ext: &Extension,
+    enabled: bool,
+    store: &Store,
+    adapters: &[Box<dyn adapter::AgentAdapter>],
+) -> Result<(), HkError> {
     let parts: Vec<&str> = ext.name.splitn(3, ':').collect();
     if parts.len() < 3 {
         return Err(HkError::Validation(format!(
@@ -305,7 +317,9 @@ fn toggle_hook(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<dy
         if !ext.agents.contains(&a.name().to_string()) {
             continue;
         }
-        let Some(config_path) = a.hook_config_path_for(&ext.scope) else { continue };
+        let Some(config_path) = a.hook_config_path_for(&ext.scope) else {
+            continue;
+        };
         if enabled {
             let saved = store.get_disabled_config(&ext.id)?.ok_or_else(|| {
                 HkError::NotFound(format!("No saved config for hook '{}'", ext.name))
@@ -370,7 +384,12 @@ fn disabled_plugin_name(path: &Path) -> String {
         .unwrap_or_else(|| base.to_string())
 }
 
-fn toggle_plugin(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<dyn adapter::AgentAdapter>]) -> Result<(), HkError> {
+fn toggle_plugin(
+    ext: &Extension,
+    enabled: bool,
+    store: &Store,
+    adapters: &[Box<dyn adapter::AgentAdapter>],
+) -> Result<(), HkError> {
     for a in adapters {
         if !ext.agents.contains(&a.name().to_string()) {
             continue;
@@ -395,7 +414,8 @@ fn toggle_plugin(ext: &Extension, enabled: bool, store: &Store, adapters: &[Box<
             // If so, toggle via state.vscdb. Otherwise fall through to manifest rename.
             // Cache read_plugins result to avoid scanning twice for CLI plugins.
             let plugins = a.read_plugins();
-            let plugin_uri = plugins.iter()
+            let plugin_uri = plugins
+                .iter()
                 .find(|p| {
                     let id_name = format!("{}:{}", p.name, p.source);
                     scanner::stable_id_for(&id_name, "plugin", a.name()) == ext.id
@@ -472,7 +492,8 @@ fn toggle_plugin_manifest(
                 && let Some(manifest) = plugin_toggle_target(path)
             {
                 let disabled_manifest = disabled_plugin_target(&manifest);
-                let saved = serde_json::json!({ "manifest_path": disabled_manifest.to_string_lossy() });
+                let saved =
+                    serde_json::json!({ "manifest_path": disabled_manifest.to_string_lossy() });
                 store.set_disabled_config(&ext.id, Some(&saved.to_string()))?;
                 std::fs::rename(&manifest, &disabled_manifest)?;
                 found = true;
@@ -590,14 +611,13 @@ pub fn check_update_with_cache(
     };
     // Validate DB-sourced URL before passing to git
     if let Err(e) = sanitize::validate_git_url(url) {
-        return UpdateStatus::Error { message: e.to_string() };
+        return UpdateStatus::Error {
+            message: e.to_string(),
+        };
     }
     let remote_result = cache
         .entry(url.to_string())
-        .or_insert_with(|| {
-            get_remote_head(url)
-                .map_err(|e| e.to_string())
-        });
+        .or_insert_with(|| get_remote_head(url).map_err(|e| e.to_string()));
     match remote_result {
         Ok(remote_hash) => {
             let remote_hash = remote_hash.clone();
@@ -621,7 +641,9 @@ pub fn check_update_with_cache(
                     remote_hash: meta.revision.clone().unwrap_or_default(),
                 }
             } else {
-                UpdateStatus::Error { message: msg.clone() }
+                UpdateStatus::Error {
+                    message: msg.clone(),
+                }
             }
         }
     }
@@ -674,7 +696,14 @@ pub fn install_from_git_with_id(
     let clone_dir = temp.path().join("repo");
 
     let output = silent_command("git")
-        .args(["clone", "--depth", "1", "--", url, &clone_dir.to_string_lossy()])
+        .args([
+            "clone",
+            "--depth",
+            "1",
+            "--",
+            url,
+            &clone_dir.to_string_lossy(),
+        ])
         .output()
         .map_err(|e| HkError::CommandFailed(format!("Failed to run git clone: {e}")))?;
 
@@ -1810,8 +1839,7 @@ mod tests {
         });
         let redacted = super::redact_mcp_env(&entry);
         assert_eq!(
-            redacted["env"]["PATH"],
-            "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+            redacted["env"]["PATH"], "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
             "PATH must be preserved verbatim, not redacted"
         );
         assert_eq!(redacted["env"]["API_KEY"], "<redacted>");
@@ -1833,8 +1861,7 @@ mod tests {
         });
         let redacted = super::redact_mcp_env(&entry);
         assert_eq!(
-            redacted["environment"]["PATH"],
-            "/opt/homebrew/bin:/usr/local/bin",
+            redacted["environment"]["PATH"], "/opt/homebrew/bin:/usr/local/bin",
             "PATH must round-trip through redaction even under OpenCode's 'environment' key"
         );
         assert_eq!(redacted["environment"]["GITHUB_TOKEN"], "<redacted>");
@@ -1855,11 +1882,8 @@ mod tests {
         // Create a symlink to an outside file
         let outside = TempDir::new().unwrap();
         std::fs::write(outside.path().join("secret"), "TOP SECRET").unwrap();
-        std::os::unix::fs::symlink(
-            outside.path().join("secret"),
-            src.path().join("stolen"),
-        )
-        .unwrap();
+        std::os::unix::fs::symlink(outside.path().join("secret"), src.path().join("stolen"))
+            .unwrap();
 
         let dst = TempDir::new().unwrap();
         let dst_dir = dst.path().join("result");
@@ -1875,7 +1899,9 @@ mod tests {
     // Issue #16: plugin toggle end-to-end scenarios
     // -----------------------------------------------------------------------
 
-    fn claude_env(dir: &std::path::Path) -> (Vec<Box<dyn adapter::AgentAdapter>>, std::path::PathBuf) {
+    fn claude_env(
+        dir: &std::path::Path,
+    ) -> (Vec<Box<dyn adapter::AgentAdapter>>, std::path::PathBuf) {
         let claude_dir = dir.join(".claude");
         std::fs::create_dir_all(claude_dir.join("plugins")).unwrap();
         let settings = claude_dir.join("settings.json");
@@ -1924,7 +1950,8 @@ mod tests {
         std::fs::write(
             &settings,
             r#"{"enabledPlugins":{"test-plugin@marketplace":true}}"#,
-        ).unwrap();
+        )
+        .unwrap();
         std::fs::write(
             dir.path().join(".claude/plugins/installed_plugins.json"),
             r#"{"plugins":{"test-plugin@marketplace":[{"installPath":"/tmp/p/1.0","installedAt":"2026-01-01T00:00:00Z"}]}}"#,
@@ -1933,7 +1960,10 @@ mod tests {
         // Use scanner to get the real extension with correct stable ID
         let scanned = scanner::scan_plugins(&*adapters[0]);
         assert_eq!(scanned.len(), 1);
-        assert!(scanned[0].enabled, "Plugin should be enabled (in enabledPlugins)");
+        assert!(
+            scanned[0].enabled,
+            "Plugin should be enabled (in enabledPlugins)"
+        );
         store.sync_extensions(&scanned).unwrap();
         let ext_id = scanned[0].id.clone();
 
@@ -1943,7 +1973,8 @@ mod tests {
 
         assert!(!store.get_extension(&ext_id).unwrap().unwrap().enabled);
         // Native toggle: no disabled_config needed, settings.json has false
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["test-plugin@marketplace"], false);
 
         // Re-enable via HK — native toggle sets enabledPlugins to true
@@ -1951,7 +1982,8 @@ mod tests {
         assert!(r.is_ok(), "re-enable failed: {:?}", r.err());
 
         assert!(store.get_extension(&ext_id).unwrap().unwrap().enabled);
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["test-plugin@marketplace"], true);
     }
 
@@ -1964,7 +1996,11 @@ mod tests {
         let (adapters, settings) = claude_env(dir.path());
 
         // Plugin in installed_plugins but enabledPlugins has it as false
-        std::fs::write(&settings, r#"{"enabledPlugins":{"test-plugin@marketplace":false}}"#).unwrap();
+        std::fs::write(
+            &settings,
+            r#"{"enabledPlugins":{"test-plugin@marketplace":false}}"#,
+        )
+        .unwrap();
         std::fs::write(
             dir.path().join(".claude/plugins/installed_plugins.json"),
             r#"{"plugins":{"test-plugin@marketplace":[{"installPath":"/tmp/p/1.0","installedAt":"2026-01-01T00:00:00Z"}]}}"#,
@@ -1980,7 +2016,8 @@ mod tests {
         assert!(r.is_ok(), "enable should succeed: {:?}", r.err());
 
         // Verify settings.json was updated
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["test-plugin@marketplace"], true);
     }
 
@@ -1991,7 +2028,11 @@ mod tests {
         let store = crate::store::Store::open(&dir.path().join("test.db")).unwrap();
         let (adapters, settings) = claude_env(dir.path());
 
-        std::fs::write(&settings, r#"{"enabledPlugins":{"test-plugin@marketplace":true}}"#).unwrap();
+        std::fs::write(
+            &settings,
+            r#"{"enabledPlugins":{"test-plugin@marketplace":true}}"#,
+        )
+        .unwrap();
         std::fs::write(
             dir.path().join(".claude/plugins/installed_plugins.json"),
             r#"{"plugins":{"test-plugin@marketplace":[{"installPath":"/tmp/p/1.0","installedAt":"2026-01-01T00:00:00Z"}]}}"#,
@@ -2004,13 +2045,15 @@ mod tests {
         // Disable
         let r = toggle_extension_with_adapters(&store, &adapters, &ext_id, false);
         assert!(r.is_ok(), "disable failed: {:?}", r.err());
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["test-plugin@marketplace"], false);
 
         // Re-enable
         let r = toggle_extension_with_adapters(&store, &adapters, &ext_id, true);
         assert!(r.is_ok(), "re-enable failed: {:?}", r.err());
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["test-plugin@marketplace"], true);
     }
 
@@ -2033,12 +2076,14 @@ mod tests {
 
         let r = toggle_extension_with_adapters(&store, &adapters, &ext_id, false);
         assert!(r.is_ok(), "disable no-source plugin failed: {:?}", r.err());
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["local-plugin"], false);
 
         let r = toggle_extension_with_adapters(&store, &adapters, &ext_id, true);
         assert!(r.is_ok(), "enable no-source plugin failed: {:?}", r.err());
-        let s: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
+        let s: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&settings).unwrap()).unwrap();
         assert_eq!(s["enabledPlugins"]["local-plugin"], true);
     }
 
@@ -2047,11 +2092,13 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let store = crate::store::Store::open(&dir.path().join("test.db")).unwrap();
         let codex_dir = dir.path().join(".codex");
-        std::fs::create_dir_all(codex_dir.join("plugins/cache/mp/my-plugin/1.0.0/.codex-plugin")).unwrap();
+        std::fs::create_dir_all(codex_dir.join("plugins/cache/mp/my-plugin/1.0.0/.codex-plugin"))
+            .unwrap();
         std::fs::write(
             codex_dir.join("plugins/cache/mp/my-plugin/1.0.0/.codex-plugin/plugin.json"),
             r#"{"name":"my-plugin"}"#,
-        ).unwrap();
+        )
+        .unwrap();
         std::fs::write(codex_dir.join("config.toml"), "").unwrap();
 
         let codex_adapter = adapter::codex::CodexAdapter::with_home(dir.path().to_path_buf());
@@ -2067,8 +2114,12 @@ mod tests {
         assert!(r.is_ok(), "codex disable failed: {:?}", r.err());
 
         let config: toml::Table = std::fs::read_to_string(codex_dir.join("config.toml"))
-            .unwrap().parse().unwrap();
-        let plugin_enabled = config["plugins"]["my-plugin@mp"]["enabled"].as_bool().unwrap();
+            .unwrap()
+            .parse()
+            .unwrap();
+        let plugin_enabled = config["plugins"]["my-plugin@mp"]["enabled"]
+            .as_bool()
+            .unwrap();
         assert!(!plugin_enabled, "config.toml should show enabled=false");
 
         // Re-enable
@@ -2076,8 +2127,12 @@ mod tests {
         assert!(r.is_ok(), "codex re-enable failed: {:?}", r.err());
 
         let config: toml::Table = std::fs::read_to_string(codex_dir.join("config.toml"))
-            .unwrap().parse().unwrap();
-        let plugin_enabled = config["plugins"]["my-plugin@mp"]["enabled"].as_bool().unwrap();
+            .unwrap()
+            .parse()
+            .unwrap();
+        let plugin_enabled = config["plugins"]["my-plugin@mp"]["enabled"]
+            .as_bool()
+            .unwrap();
         assert!(plugin_enabled, "config.toml should show enabled=true");
     }
 
@@ -2091,7 +2146,9 @@ mod tests {
         let store = crate::store::Store::open(&dir.path().join("test.db")).unwrap();
 
         // Set up a Copilot VS Code agent plugin with .github/plugin/plugin.json
-        let plugin_dir = dir.path().join(".vscode/agent-plugins/github.com/org/repo/plugins/my-plugin");
+        let plugin_dir = dir
+            .path()
+            .join(".vscode/agent-plugins/github.com/org/repo/plugins/my-plugin");
         let manifest_dir = plugin_dir.join(".github/plugin");
         std::fs::create_dir_all(&manifest_dir).unwrap();
         std::fs::write(manifest_dir.join("plugin.json"), r#"{"name":"my-plugin"}"#).unwrap();
@@ -2106,8 +2163,10 @@ mod tests {
                     "marketplace": "github.com",
                     "pluginUri": &plugin_uri
                 }]
-            }).to_string(),
-        ).unwrap();
+            })
+            .to_string(),
+        )
+        .unwrap();
 
         // Create VS Code state.vscdb with the enablement table
         #[cfg(target_os = "macos")]
@@ -2121,10 +2180,18 @@ mod tests {
         let state_db = state_db_dir.join("state.vscdb");
         {
             let conn = rusqlite::Connection::open(&state_db).unwrap();
-            conn.execute("CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE, value TEXT)", []).unwrap();
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE, value TEXT)",
+                [],
+            )
+            .unwrap();
             // Plugin starts enabled
             let val = serde_json::json!([[&plugin_uri, true]]).to_string();
-            conn.execute("INSERT INTO ItemTable (key, value) VALUES ('agentPlugins.enablement', ?1)", [&val]).unwrap();
+            conn.execute(
+                "INSERT INTO ItemTable (key, value) VALUES ('agentPlugins.enablement', ?1)",
+                [&val],
+            )
+            .unwrap();
         }
 
         let adapter = adapter::copilot::CopilotAdapter::with_home(dir.path().to_path_buf());
@@ -2148,9 +2215,13 @@ mod tests {
         // state.vscdb should show disabled
         {
             let conn = rusqlite::Connection::open(&state_db).unwrap();
-            let val: String = conn.query_row(
-                "SELECT value FROM ItemTable WHERE key = 'agentPlugins.enablement'", [], |r| r.get(0)
-            ).unwrap();
+            let val: String = conn
+                .query_row(
+                    "SELECT value FROM ItemTable WHERE key = 'agentPlugins.enablement'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
             let entries: Vec<(String, bool)> = serde_json::from_str(&val).unwrap();
             assert!(!entries[0].1, "state.vscdb should show plugin disabled");
         }
@@ -2160,9 +2231,13 @@ mod tests {
         assert!(r.is_ok(), "re-enable failed: {:?}", r.err());
         {
             let conn = rusqlite::Connection::open(&state_db).unwrap();
-            let val: String = conn.query_row(
-                "SELECT value FROM ItemTable WHERE key = 'agentPlugins.enablement'", [], |r| r.get(0)
-            ).unwrap();
+            let val: String = conn
+                .query_row(
+                    "SELECT value FROM ItemTable WHERE key = 'agentPlugins.enablement'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
             let entries: Vec<(String, bool)> = serde_json::from_str(&val).unwrap();
             assert!(entries[0].1, "state.vscdb should show plugin enabled");
         }
@@ -2173,14 +2248,25 @@ mod tests {
         let dir = TempDir::new().unwrap();
 
         // Set up VS Code plugin
-        let plugin_dir = dir.path().join(".vscode/agent-plugins/github.com/org/repo/plugins/my-plugin");
+        let plugin_dir = dir
+            .path()
+            .join(".vscode/agent-plugins/github.com/org/repo/plugins/my-plugin");
         std::fs::create_dir_all(plugin_dir.join(".github/plugin")).unwrap();
-        std::fs::write(plugin_dir.join(".github/plugin/plugin.json"), r#"{"name":"my-plugin"}"#).unwrap();
+        std::fs::write(
+            plugin_dir.join(".github/plugin/plugin.json"),
+            r#"{"name":"my-plugin"}"#,
+        )
+        .unwrap();
         let plugin_uri = format!("file://{}", plugin_dir.to_string_lossy());
         let vscode_dir = dir.path().join(".vscode/agent-plugins");
-        std::fs::write(vscode_dir.join("installed.json"), serde_json::json!({
-            "installed": [{"marketplace": "github.com", "pluginUri": &plugin_uri}]
-        }).to_string()).unwrap();
+        std::fs::write(
+            vscode_dir.join("installed.json"),
+            serde_json::json!({
+                "installed": [{"marketplace": "github.com", "pluginUri": &plugin_uri}]
+            })
+            .to_string(),
+        )
+        .unwrap();
 
         // state.vscdb with plugin DISABLED
         #[cfg(target_os = "macos")]
@@ -2191,16 +2277,28 @@ mod tests {
         let vscode_user = dir.path().join(".config/Code/User");
         std::fs::create_dir_all(vscode_user.join("globalStorage")).unwrap();
         {
-            let conn = rusqlite::Connection::open(vscode_user.join("globalStorage/state.vscdb")).unwrap();
-            conn.execute("CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE, value TEXT)", []).unwrap();
+            let conn =
+                rusqlite::Connection::open(vscode_user.join("globalStorage/state.vscdb")).unwrap();
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT UNIQUE, value TEXT)",
+                [],
+            )
+            .unwrap();
             let val = serde_json::json!([[&plugin_uri, false]]).to_string();
-            conn.execute("INSERT INTO ItemTable (key, value) VALUES ('agentPlugins.enablement', ?1)", [&val]).unwrap();
+            conn.execute(
+                "INSERT INTO ItemTable (key, value) VALUES ('agentPlugins.enablement', ?1)",
+                [&val],
+            )
+            .unwrap();
         }
 
         let adapter = adapter::copilot::CopilotAdapter::with_home(dir.path().to_path_buf());
         let scanned = scanner::scan_plugins(&adapter);
         assert_eq!(scanned.len(), 1);
-        assert!(!scanned[0].enabled, "Scanner should detect VS Code disabled state from state.vscdb");
+        assert!(
+            !scanned[0].enabled,
+            "Scanner should detect VS Code disabled state from state.vscdb"
+        );
     }
 
     #[test]
@@ -2209,7 +2307,9 @@ mod tests {
         let store = crate::store::Store::open(&dir.path().join("test.db")).unwrap();
 
         // Plugin directory exists but has NO manifest file at all
-        let plugin_dir = dir.path().join(".cursor/plugins/cache/mp/ghost-plugin/1.0.0");
+        let plugin_dir = dir
+            .path()
+            .join(".cursor/plugins/cache/mp/ghost-plugin/1.0.0");
         std::fs::create_dir_all(&plugin_dir).unwrap();
         // No plugin.json, no .cursor-plugin/plugin.json — nothing
 
@@ -2235,7 +2335,8 @@ mod tests {
         let plugin_path = plugins_dir.join("lint.ts");
         std::fs::write(&plugin_path, "export default {};").unwrap();
 
-        let adapter = crate::adapter::opencode::OpencodeAdapter::with_home(dir.path().to_path_buf());
+        let adapter =
+            crate::adapter::opencode::OpencodeAdapter::with_home(dir.path().to_path_buf());
         let adapters: Vec<Box<dyn adapter::AgentAdapter>> = vec![Box::new(adapter)];
 
         let scanned = scanner::scan_plugins(&*adapters[0]);

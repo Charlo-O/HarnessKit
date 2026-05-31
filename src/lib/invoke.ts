@@ -2,6 +2,8 @@ import { transport } from "./transport";
 import type {
   AgentDetail,
   AgentInfo,
+  AgentSessionInfo,
+  AgentSessionSyncSummary,
   AgentSyncItem,
   AgentSyncSummary,
   AuditResult,
@@ -369,5 +371,29 @@ export const api = {
 
   syncToAgents(items: AgentSyncItem[]): Promise<AgentSyncSummary> {
     return transport("sync_to_agents", { items });
+  },
+
+  listAgentSessions(): Promise<AgentSessionInfo[]> {
+    return transport("list_agent_sessions");
+  },
+
+  syncAgentSessions(
+    sourceAgent: string,
+    sourceRootId: string,
+    targetAgents: string[],
+    sourceSessionPath?: string,
+  ): Promise<AgentSessionSyncSummary> {
+    const payload: {
+      sourceAgent: string;
+      sourceRootId: string;
+      targetAgents: string[];
+      sourceSessionPath?: string;
+    } = {
+      sourceAgent,
+      sourceRootId,
+      targetAgents,
+    };
+    if (sourceSessionPath) payload.sourceSessionPath = sourceSessionPath;
+    return transport("sync_agent_sessions", payload);
   },
 };

@@ -16,7 +16,6 @@ fn main() {
     std::fs::create_dir_all(&data_dir).expect("Failed to create data dir");
     let store = Store::open(&data_dir.join("metadata.db")).expect("Failed to open database");
 
-
     // NOTE: tauri.conf.json sets `macOSPrivateApi: true`. This is required for:
     // 1. Window transparency (`"transparent": true` in window config)
     // 2. Sidebar vibrancy effect (`"windowEffects": {"effects": ["sidebar"]}`)
@@ -91,6 +90,8 @@ fn main() {
             commands::sync_push,
             commands::sync_pull,
             commands::sync_to_agents,
+            commands::list_agent_sessions,
+            commands::sync_agent_sessions,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

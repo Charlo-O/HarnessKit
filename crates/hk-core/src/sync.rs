@@ -1,9 +1,9 @@
 //! Git-based sync engine for pushing/pulling Skills, MCP configs, and Hooks
 //! to/from a remote Git repository.
 
+use crate::HkError;
 use crate::adapter::AgentAdapter;
 use crate::models::{SyncConfig, SyncSummary};
-use crate::HkError;
 use std::path::{Path, PathBuf};
 
 /// Keyring service name for storing the Git auth token.
@@ -253,7 +253,10 @@ pub fn push(
                 let entries = std::fs::read_dir(&skill_dir)?;
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if path.is_dir() && (path.join("SKILL.md").exists() || path.join("SKILL.md.disabled").exists()) {
+                    if path.is_dir()
+                        && (path.join("SKILL.md").exists()
+                            || path.join("SKILL.md.disabled").exists())
+                    {
                         let dest = target.join(path.file_name().unwrap());
                         copy_dir_recursive(&path, &dest)?;
                         skills_count += 1;
@@ -314,8 +317,18 @@ pub fn push(
 
     // Commit and push
     let hostname = hostname();
-    let message = format!("sync: push from {} at {}", hostname, chrono::Utc::now().format("%Y-%m-%d %H:%M"));
-    let commit_hash = commit_and_push(&repo_dir, &config.branch, &message, &token, &config.repo_url)?;
+    let message = format!(
+        "sync: push from {} at {}",
+        hostname,
+        chrono::Utc::now().format("%Y-%m-%d %H:%M")
+    );
+    let commit_hash = commit_and_push(
+        &repo_dir,
+        &config.branch,
+        &message,
+        &token,
+        &config.repo_url,
+    )?;
 
     let summary = SyncSummary {
         direction: "push".into(),

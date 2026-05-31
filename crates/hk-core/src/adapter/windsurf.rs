@@ -294,8 +294,7 @@ mod tests {
             hook.event == "pre_user_prompt" && hook.command == "python3 /tmp/check.py"
         }));
         assert!(hooks.iter().any(|hook| {
-            hook.event == "post_cascade_response"
-                && hook.command == "python C:\\hooks\\log.py"
+            hook.event == "post_cascade_response" && hook.command == "python C:\\hooks\\log.py"
         }));
     }
 
@@ -338,7 +337,11 @@ mod tests {
     fn global_settings_files_excludes_workflows() {
         let adapter = WindsurfAdapter::with_home(tempfile::tempdir().unwrap().path().to_path_buf());
         let files = adapter.global_settings_files();
-        assert!(!files.iter().any(|p| p.to_string_lossy().contains("global_workflows")));
+        assert!(
+            !files
+                .iter()
+                .any(|p| p.to_string_lossy().contains("global_workflows"))
+        );
     }
 
     #[test]

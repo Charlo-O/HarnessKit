@@ -1,6 +1,6 @@
 use crate::HkError;
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::{Path, PathBuf};
 
 use crate::models::*;
@@ -64,7 +64,10 @@ impl Store {
     pub fn open(path: &Path) -> Result<Self, HkError> {
         let conn = Connection::open(path)?;
         conn.execute_batch("PRAGMA foreign_keys = ON")?;
-        let store = Self { conn, db_path: path.to_path_buf() };
+        let store = Self {
+            conn,
+            db_path: path.to_path_buf(),
+        };
         store.migrate()?;
 
         // Set file permissions to owner-only on Unix (0o600) to protect
@@ -105,11 +108,12 @@ impl Store {
     /// Errors are logged but do not abort the migration — a failed backup
     /// should not prevent the app from starting.
     fn backup_before_migrate(&self, current_version: i64) {
-        let backup_path = self.db_path.with_extension(
-            format!("db.backup-v{}", current_version),
-        );
+        let backup_path = self
+            .db_path
+            .with_extension(format!("db.backup-v{}", current_version));
         // Only create a backup if the DB file actually exists (skip for in-memory / new DBs)
-        if self.db_path.exists() && !backup_path.exists()
+        if self.db_path.exists()
+            && !backup_path.exists()
             && let Err(e) = std::fs::copy(&self.db_path, &backup_path)
         {
             eprintln!(
@@ -137,11 +141,21 @@ impl Store {
             self.backup_before_migrate(current_version);
         }
 
-        if current_version < 1 { self.migrate_v1()?; }
-        if current_version < 2 { self.migrate_v2()?; }
-        if current_version < 3 { self.migrate_v3()?; }
-        if current_version < 4 { self.migrate_v4()?; }
-        if current_version < 5 { self.migrate_v5()?; }
+        if current_version < 1 {
+            self.migrate_v1()?;
+        }
+        if current_version < 2 {
+            self.migrate_v2()?;
+        }
+        if current_version < 3 {
+            self.migrate_v3()?;
+        }
+        if current_version < 4 {
+            self.migrate_v4()?;
+        }
+        if current_version < 5 {
+            self.migrate_v5()?;
+        }
 
         // Update schema version to latest
         if current_version < LATEST_SCHEMA_VERSION {
@@ -190,7 +204,7 @@ impl Store {
 
             CREATE INDEX IF NOT EXISTS idx_extensions_kind ON extensions(kind);
             CREATE INDEX IF NOT EXISTS idx_audit_results_ext ON audit_results(extension_id);
-            "
+            ",
         )?;
         // Migration: add category column for existing databases
         self.migrate_add_column("ALTER TABLE extensions ADD COLUMN category TEXT");
@@ -217,16 +231,15 @@ impl Store {
         self.migrate_add_column("ALTER TABLE extensions ADD COLUMN checked_at TEXT");
         self.migrate_add_column("ALTER TABLE extensions ADD COLUMN check_error TEXT");
         // Migration: hidden_extensions table for surviving re-scans
-        self.conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS hidden_extensions (id TEXT PRIMARY KEY)"
-        )?;
+        self.conn
+            .execute_batch("CREATE TABLE IF NOT EXISTS hidden_extensions (id TEXT PRIMARY KEY)")?;
         // Migration: agent_settings table for custom paths and enabled state
         self.conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS agent_settings (
                 name TEXT PRIMARY KEY,
                 custom_path TEXT,
                 enabled INTEGER NOT NULL DEFAULT 1
-            )"
+            )",
         )?;
         // Migration: add sort_order to agent_settings
         self.migrate_add_column("ALTER TABLE agent_settings ADD COLUMN sort_order INTEGER");
@@ -239,7 +252,7 @@ impl Store {
                 label TEXT NOT NULL,
                 category TEXT NOT NULL DEFAULT 'settings',
                 UNIQUE(agent, path)
-            )"
+            )",
         )?;
         Ok(())
     }
@@ -255,9 +268,7 @@ impl Store {
     /// custom paths surface under the scope they were added in. NULL is
     /// interpreted as Global (legacy rows added before scope tracking).
     fn migrate_v4(&self) -> Result<(), HkError> {
-        self.migrate_add_column(
-            "ALTER TABLE custom_config_paths ADD COLUMN scope_json TEXT",
-        );
+        self.migrate_add_column("ALTER TABLE custom_config_paths ADD COLUMN scope_json TEXT");
         Ok(())
     }
 
@@ -282,7 +293,8 @@ impl Store {
 
     /// Schema v2: extension_agents join table for efficient agent-based filtering.
     fn migrate_v2(&self) -> Result<(), HkError> {
-        self.conn.execute_batch("
+        self.conn.execute_batch(
+            "
             CREATE TABLE IF NOT EXISTS extension_agents (
                 extension_id TEXT NOT NULL,
                 agent_name TEXT NOT NULL,
@@ -290,14 +302,17 @@ impl Store {
                 FOREIGN KEY (extension_id) REFERENCES extensions(id) ON DELETE CASCADE
             );
             CREATE INDEX IF NOT EXISTS idx_ext_agents_agent ON extension_agents(agent_name);
-        ")?;
+        ",
+        )?;
         // Backfill from existing agents_json (OR IGNORE for idempotency)
-        self.conn.execute_batch("
+        self.conn.execute_batch(
+            "
             INSERT OR IGNORE INTO extension_agents (extension_id, agent_name)
             SELECT e.id, json_each.value
             FROM extensions e, json_each(e.agents_json)
             WHERE e.agents_json IS NOT NULL AND e.agents_json != '[]';
-        ")?;
+        ",
+        )?;
         Ok(())
     }
 
@@ -430,7 +445,13 @@ impl Store {
         )?;
         let rows = stmt
             .query_map(params![agent], |row| {
-                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
             })?
             .filter_map(|r| r.map_err(|e| eprintln!("[hk] row error: {e}")).ok())
             .collect();
@@ -465,7 +486,9 @@ impl Store {
                 Option::<String>::None,
                 ext.source_path,
                 ext.cli_parent_id,
-                ext.cli_meta.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
+                ext.cli_meta
+                    .as_ref()
+                    .map(|m| serde_json::to_string(m).unwrap_or_default()),
                 im.map(|m| m.install_type.as_str()),
                 im.and_then(|m| m.url.as_deref()),
                 im.and_then(|m| m.url_resolved.as_deref()),
@@ -683,10 +706,14 @@ impl Store {
     }
 
     /// Find all extension IDs with the same name and kind.
-    pub fn find_ids_by_name_and_kind(&self, name: &str, kind: &str) -> Result<Vec<String>, HkError> {
-        let mut stmt = self.conn.prepare(
-            "SELECT id FROM extensions WHERE name = ?1 AND kind = ?2",
-        )?;
+    pub fn find_ids_by_name_and_kind(
+        &self,
+        name: &str,
+        kind: &str,
+    ) -> Result<Vec<String>, HkError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id FROM extensions WHERE name = ?1 AND kind = ?2")?;
         let rows = stmt.query_map(params![name, kind], |row| row.get::<_, String>(0))?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
@@ -738,8 +765,15 @@ impl Store {
 
     /// Sync the extension_agents join table for a single extension.
     /// Deletes existing rows and re-inserts from the provided agent list.
-    fn sync_extension_agents(conn: &rusqlite::Connection, ext_id: &str, agents: &[String]) -> Result<(), HkError> {
-        conn.execute("DELETE FROM extension_agents WHERE extension_id = ?1", params![ext_id])?;
+    fn sync_extension_agents(
+        conn: &rusqlite::Connection,
+        ext_id: &str,
+        agents: &[String],
+    ) -> Result<(), HkError> {
+        conn.execute(
+            "DELETE FROM extension_agents WHERE extension_id = ?1",
+            params![ext_id],
+        )?;
         for agent in agents {
             conn.execute(
                 "INSERT INTO extension_agents (extension_id, agent_name) VALUES (?1, ?2)",
@@ -750,7 +784,8 @@ impl Store {
     }
 
     pub fn delete_extension(&self, id: &str) -> Result<(), HkError> {
-        self.conn.execute("DELETE FROM extensions WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM extensions WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -782,7 +817,9 @@ impl Store {
                     Option::<String>::None,
                     ext.source_path,
                     ext.cli_parent_id,
-                    ext.cli_meta.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
+                    ext.cli_meta
+                        .as_ref()
+                        .map(|m| serde_json::to_string(m).unwrap_or_default()),
                     ext.pack,
                     serde_json::to_string(&ext.scope)?,
                 ],
@@ -812,10 +849,14 @@ impl Store {
             extensions.iter().map(|e| e.id.as_str()).collect();
         let stale_ids: Vec<(String, bool, bool)> = {
             let mut stmt = tx.prepare(
-                "SELECT id, enabled, (install_type IS NOT NULL) as has_meta FROM extensions"
+                "SELECT id, enabled, (install_type IS NOT NULL) as has_meta FROM extensions",
             )?;
             stmt.query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, bool>(1)?, row.get::<_, bool>(2)?))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, bool>(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
             })?
             .filter_map(|r| r.map_err(|e| eprintln!("[hk] row error: {e}")).ok())
             .collect()
@@ -886,7 +927,9 @@ impl Store {
                     Option::<String>::None,
                     ext.source_path,
                     ext.cli_parent_id,
-                    ext.cli_meta.as_ref().map(|m| serde_json::to_string(m).unwrap_or_default()),
+                    ext.cli_meta
+                        .as_ref()
+                        .map(|m| serde_json::to_string(m).unwrap_or_default()),
                     ext.pack,
                     serde_json::to_string(&ext.scope)?,
                 ],
@@ -904,13 +947,17 @@ impl Store {
                 "SELECT DISTINCT e.id, e.enabled, (e.install_type IS NOT NULL) as has_meta
                  FROM extensions e
                  INNER JOIN extension_agents ea ON e.id = ea.extension_id
-                 WHERE ea.agent_name = ?1"
+                 WHERE ea.agent_name = ?1",
             )?;
             stmt.query_map(params![agent], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, bool>(1)?, row.get::<_, bool>(2)?))
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, bool>(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
             })?
-                .filter_map(|r| r.ok())
-                .collect()
+            .filter_map(|r| r.ok())
+            .collect()
         };
         for (id, enabled, has_install_meta) in &stale_ids {
             if !scanned_ids.contains(id.as_str()) && *enabled && !has_install_meta {
@@ -1077,12 +1124,16 @@ impl Store {
     /// Count audit findings by severity across all latest audit results.
     /// Uses a single SQL query (list_latest_audit_results) then aggregates
     /// in Rust, replacing the previous N+1 pattern of querying per-extension.
-    pub fn count_latest_findings_by_severity(&self) -> Result<std::collections::HashMap<String, usize>, HkError> {
+    pub fn count_latest_findings_by_severity(
+        &self,
+    ) -> Result<std::collections::HashMap<String, usize>, HkError> {
         let results = self.list_latest_audit_results()?;
         let mut counts = std::collections::HashMap::new();
         for result in &results {
             for finding in &result.findings {
-                *counts.entry(finding.severity.as_str().to_string()).or_insert(0) += 1;
+                *counts
+                    .entry(finding.severity.as_str().to_string())
+                    .or_insert(0) += 1;
             }
         }
         Ok(counts)
@@ -1229,29 +1280,32 @@ impl Store {
 
     /// Read the single-row sync_config (id=1). Returns Ok(None) if no config saved yet.
     pub fn get_sync_config(&self) -> Result<Option<SyncConfig>, HkError> {
-        let result = self.conn.query_row(
-            "SELECT repo_url, branch, auth_type, sync_skills, sync_mcp, sync_hooks,
+        let result = self
+            .conn
+            .query_row(
+                "SELECT repo_url, branch, auth_type, sync_skills, sync_mcp, sync_hooks,
                     last_sync_at, last_sync_summary
              FROM sync_config WHERE id = 1",
-            [],
-            |row| {
-                let last_sync_at_str: Option<String> = row.get(6)?;
-                Ok(SyncConfig {
-                    repo_url: row.get(0)?,
-                    branch: row.get(1)?,
-                    auth_type: row.get(2)?,
-                    sync_skills: row.get::<_, i64>(3)? != 0,
-                    sync_mcp: row.get::<_, i64>(4)? != 0,
-                    sync_hooks: row.get::<_, i64>(5)? != 0,
-                    last_sync_at: last_sync_at_str.and_then(|s| {
-                        DateTime::parse_from_rfc3339(&s)
-                            .ok()
-                            .map(|d| d.with_timezone(&Utc))
-                    }),
-                    last_sync_summary: row.get(7)?,
-                })
-            },
-        ).optional()?;
+                [],
+                |row| {
+                    let last_sync_at_str: Option<String> = row.get(6)?;
+                    Ok(SyncConfig {
+                        repo_url: row.get(0)?,
+                        branch: row.get(1)?,
+                        auth_type: row.get(2)?,
+                        sync_skills: row.get::<_, i64>(3)? != 0,
+                        sync_mcp: row.get::<_, i64>(4)? != 0,
+                        sync_hooks: row.get::<_, i64>(5)? != 0,
+                        last_sync_at: last_sync_at_str.and_then(|s| {
+                            DateTime::parse_from_rfc3339(&s)
+                                .ok()
+                                .map(|d| d.with_timezone(&Utc))
+                        }),
+                        last_sync_summary: row.get(7)?,
+                    })
+                },
+            )
+            .optional()?;
         // Treat empty repo_url as "not configured yet"
         Ok(result.filter(|c| !c.repo_url.is_empty()))
     }
@@ -1311,7 +1365,11 @@ mod tests {
         let db_path = dir.path().join("permissions_test.db");
         let _store = Store::open(&db_path).unwrap();
         let perms = std::fs::metadata(&db_path).unwrap().permissions();
-        assert_eq!(perms.mode() & 0o777, 0o600, "Database file should be owner-only (0600)");
+        assert_eq!(
+            perms.mode() & 0o777,
+            0o600,
+            "Database file should be owner-only (0600)"
+        );
     }
 
     fn sample_extension() -> Extension {
@@ -2261,11 +2319,14 @@ mod tests {
         store.insert_extension(&ext).unwrap();
 
         // Verify join table rows exist
-        let count: i64 = store.conn.query_row(
-            "SELECT COUNT(*) FROM extension_agents WHERE extension_id = ?1",
-            params![ext.id],
-            |row| row.get(0),
-        ).unwrap();
+        let count: i64 = store
+            .conn
+            .query_row(
+                "SELECT COUNT(*) FROM extension_agents WHERE extension_id = ?1",
+                params![ext.id],
+                |row| row.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 2);
 
         // Verify agent filter uses the join table correctly
@@ -2291,7 +2352,9 @@ mod tests {
         ext2.name = "ext-two".into();
         ext2.agents = vec!["cursor".into(), "claude".into()];
 
-        store.sync_extensions(&[ext1.clone(), ext2.clone()]).unwrap();
+        store
+            .sync_extensions(&[ext1.clone(), ext2.clone()])
+            .unwrap();
 
         // Verify both come back for claude
         let claude = store.list_extensions(None, Some("claude")).unwrap();
@@ -2344,9 +2407,13 @@ mod tests {
         ext2.agents = vec!["cursor".into()];
 
         // Sync for claude agent
-        store.sync_extensions_for_agent("claude", &[ext1.clone()]).unwrap();
+        store
+            .sync_extensions_for_agent("claude", &[ext1.clone()])
+            .unwrap();
         // Sync for cursor agent separately
-        store.sync_extensions_for_agent("cursor", &[ext2.clone()]).unwrap();
+        store
+            .sync_extensions_for_agent("cursor", &[ext2.clone()])
+            .unwrap();
 
         let claude = store.list_extensions(None, Some("claude")).unwrap();
         assert_eq!(claude.len(), 1);
@@ -2444,7 +2511,8 @@ mod tests {
             }],
             trust_score: 50,
             audited_at: chrono::DateTime::parse_from_rfc3339("2024-01-01T00:00:00Z")
-                .unwrap().with_timezone(&Utc),
+                .unwrap()
+                .with_timezone(&Utc),
         };
         store.insert_audit_result(&old_audit).unwrap();
 
@@ -2454,7 +2522,8 @@ mod tests {
             findings: vec![],
             trust_score: 100,
             audited_at: chrono::DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
-                .unwrap().with_timezone(&Utc),
+                .unwrap()
+                .with_timezone(&Utc),
         };
         store.insert_audit_result(&new_audit).unwrap();
 

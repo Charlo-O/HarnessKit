@@ -2,14 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use comfy_table::{ContentArrangement, Table, presets::UTF8_FULL_CONDENSED};
-use hk_core::{
-    adapter,
-    manager,
-    models::*,
-    scanner,
-    service,
-    store::Store,
-};
+use hk_core::{adapter, manager, models::*, scanner, service, store::Store};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -183,19 +176,36 @@ fn group_key(ext: &Extension) -> String {
     let name = if ext.kind == ExtensionKind::Hook {
         // Hook name format: "event:matcher:command" — extract just the command
         let parts: Vec<&str> = ext.name.splitn(3, ':').collect();
-        if parts.len() >= 3 { parts[2].to_string() } else { ext.name.clone() }
+        if parts.len() >= 3 {
+            parts[2].to_string()
+        } else {
+            ext.name.clone()
+        }
     } else {
         ext.name.clone()
     };
-    let developer = ext.source.url.as_deref()
+    let developer = ext
+        .source
+        .url
+        .as_deref()
         .and_then(|u| {
             // Extract "owner/repo" from URL
             let u = u.trim_end_matches('/').trim_end_matches(".git");
             let parts: Vec<&str> = u.rsplitn(3, '/').collect();
-            if parts.len() >= 2 { Some(format!("{}/{}", parts[1], parts[0])) } else { None }
+            if parts.len() >= 2 {
+                Some(format!("{}/{}", parts[1], parts[0]))
+            } else {
+                None
+            }
         })
         .unwrap_or_default();
-    format!("{}\0{}\0{}\0{}", ext.kind.as_str(), name, ext.source.origin.as_str(), developer)
+    format!(
+        "{}\0{}\0{}\0{}",
+        ext.kind.as_str(),
+        name,
+        ext.source.origin.as_str(),
+        developer
+    )
 }
 
 fn cmd_status(
@@ -294,7 +304,11 @@ fn cmd_list(
             &status,
         ]);
     }
-    println!("\n  {} {}", filtered.len().to_string().bold(), "results".dimmed());
+    println!(
+        "\n  {} {}",
+        filtered.len().to_string().bold(),
+        "results".dimmed()
+    );
     println!("{table}");
     Ok(())
 }
@@ -411,7 +425,10 @@ fn cmd_audit(
     // Summary
     let total = sorted.len();
     let safe = sorted.iter().filter(|g| g.trust_score >= 80).count();
-    let low_risk = sorted.iter().filter(|g| g.trust_score >= 60 && g.trust_score < 80).count();
+    let low_risk = sorted
+        .iter()
+        .filter(|g| g.trust_score >= 60 && g.trust_score < 80)
+        .count();
     let needs_review = sorted.iter().filter(|g| g.trust_score < 60).count();
     println!();
     println!(

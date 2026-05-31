@@ -3,6 +3,7 @@ import {
   Blocks,
   Bot,
   LayoutDashboard,
+  MessageSquareText,
   RefreshCcw,
   Settings,
   Shield,
@@ -20,6 +21,7 @@ const mainNavItems = [
   { to: "/agents", icon: Bot, labelKey: "agents" },
   { to: "/extensions", icon: Blocks, labelKey: "extensions" },
   { to: "/sync", icon: RefreshCcw, labelKey: "sync" },
+  { to: "/sessions", icon: MessageSquareText, labelKey: "sessions" },
   { to: "/audit", icon: Shield, labelKey: "audit" },
   { to: "/marketplace", icon: ShoppingBag, labelKey: "marketplace" },
 ] as const;

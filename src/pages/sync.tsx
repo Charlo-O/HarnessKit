@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { IdeSyncPanel } from "@/components/extensions/ide-sync-panel";
+import { AgentSyncPanel } from "@/components/extensions/agent-sync-panel";
 import { SyncPanel } from "@/components/extensions/sync-panel";
 
 export default function SyncPage() {
@@ -12,12 +12,12 @@ export default function SyncPage() {
           {t("sync.title")}
         </h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          {t("ideSync.pageDesc")}
+          {t("agentSync.pageDesc")}
         </p>
       </div>
 
       <div className="max-w-5xl space-y-4">
-        <IdeSyncPanel />
+        <AgentSyncPanel />
         <SyncPanel />
       </div>
     </div>

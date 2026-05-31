@@ -35,7 +35,10 @@ pub async fn serve(options: ServeOptions) -> anyhow::Result<()> {
 
     eprintln!("HarnessKit Web UI running at http://{addr}");
     if options.host == "127.0.0.1" {
-        eprintln!("Access via SSH tunnel: ssh -L {p}:localhost:{p} your-server", p = options.port);
+        eprintln!(
+            "Access via SSH tunnel: ssh -L {p}:localhost:{p} your-server",
+            p = options.port
+        );
     }
     if let Some(token) = &options.token {
         eprintln!("Auth token: {token}");

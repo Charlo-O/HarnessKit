@@ -205,9 +205,15 @@ impl AgentAdapter for ClaudeAdapter {
             self.base_dir().join("keybindings.json"),
         ];
         // ~/.claude/commands/*.md (legacy, still functional)
-        files.extend(super::files_with_ext(&self.base_dir().join("commands"), "md"));
+        files.extend(super::files_with_ext(
+            &self.base_dir().join("commands"),
+            "md",
+        ));
         // ~/.claude/output-styles/*.md
-        files.extend(super::files_with_ext(&self.base_dir().join("output-styles"), "md"));
+        files.extend(super::files_with_ext(
+            &self.base_dir().join("output-styles"),
+            "md",
+        ));
         files
     }
 

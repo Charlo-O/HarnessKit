@@ -310,7 +310,9 @@ fn test_sync_preserves_enabled_after_toggle() {
     store.insert_extension(&ext).unwrap();
     store.set_enabled("plugin-1", false).unwrap();
     // Must set disabled_config so UPSERT knows HK manages this extension
-    store.set_disabled_config("plugin-1", Some(r#"{"key":"val"}"#)).unwrap();
+    store
+        .set_disabled_config("plugin-1", Some(r#"{"key":"val"}"#))
+        .unwrap();
 
     let scanned = sample_plugin("plugin-1", "claude"); // enabled: true from scanner
     store.sync_extensions(&[scanned]).unwrap();
@@ -352,7 +354,9 @@ fn test_rescan_preserves_hk_managed_disable() {
     let ext = sample_plugin("plugin-1", "claude");
     store.sync_extensions(&[ext]).unwrap();
     store.set_enabled("plugin-1", false).unwrap();
-    store.set_disabled_config("plugin-1", Some(r#"{"plugin_key":"k","value":true}"#)).unwrap();
+    store
+        .set_disabled_config("plugin-1", Some(r#"{"plugin_key":"k","value":true}"#))
+        .unwrap();
 
     // Scanner says enabled (stale) but HK has disabled_config
     let ext_enabled = sample_plugin("plugin-1", "claude");

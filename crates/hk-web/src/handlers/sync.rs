@@ -120,3 +120,31 @@ pub async fn sync_to_agents(
     blocking(move || hk_core::service::sync_to_agents(&state.store, &state.adapters, &params.items))
         .await
 }
+
+pub async fn list_agent_sessions(State(state): State<WebState>) -> Result<Vec<AgentSessionInfo>> {
+    blocking(move || Ok(hk_core::service::list_agent_sessions(&state.adapters))).await
+}
+
+#[derive(Deserialize)]
+pub struct SyncAgentSessionsInput {
+    pub source_agent: String,
+    pub source_root_id: String,
+    pub target_agents: Vec<String>,
+    pub source_session_path: Option<String>,
+}
+
+pub async fn sync_agent_sessions(
+    State(state): State<WebState>,
+    Json(params): Json<SyncAgentSessionsInput>,
+) -> Result<AgentSessionSyncSummary> {
+    blocking(move || {
+        hk_core::service::sync_agent_sessions(
+            &state.adapters,
+            &params.source_agent,
+            &params.source_root_id,
+            &params.target_agents,
+            params.source_session_path.as_deref(),
+        )
+    })
+    .await
+}

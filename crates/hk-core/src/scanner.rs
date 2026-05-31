@@ -562,10 +562,7 @@ fn get_binary_version(name: &str) -> Option<String> {
     }
     static VERSION_RE: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(r"(\d+\.\d+(?:\.\d+)?)").unwrap());
-    let output = silent_command(name)
-        .arg("--version")
-        .output()
-        .ok()?;
+    let output = silent_command(name).arg("--version").output().ok()?;
     let text = String::from_utf8_lossy(&output.stdout);
     let text = if text.trim().is_empty() {
         String::from_utf8_lossy(&output.stderr)

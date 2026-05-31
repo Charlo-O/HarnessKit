@@ -15,6 +15,7 @@ import AuditPage from "./pages/audit";
 import ExtensionsPage from "./pages/extensions";
 import MarketplacePage from "./pages/marketplace";
 import OverviewPage from "./pages/overview";
+import SessionsPage from "./pages/sessions";
 import SettingsPage from "./pages/settings";
 import SyncPage from "./pages/sync";
 import { useAuditStore } from "./stores/audit-store";
@@ -163,6 +164,7 @@ export default function App() {
               <Route path="agents" element={<AgentsPage />} />
               <Route path="extensions" element={<ExtensionsPage />} />
               <Route path="sync" element={<SyncPage />} />
+              <Route path="sessions" element={<SessionsPage />} />
               <Route path="marketplace" element={<MarketplacePage />} />
               <Route path="audit" element={<AuditPage />} />
               <Route path="settings" element={<SettingsPage />} />

@@ -529,6 +529,59 @@ pub struct AgentSyncSummary {
     pub results: Vec<AgentSyncResult>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSessionEntry {
+    pub id: String,
+    pub summary: String,
+    pub path: String,
+    pub file_name: String,
+    pub relative_path: String,
+    pub root_id: String,
+    pub root_label: String,
+    pub total_bytes: u64,
+    pub modified_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSessionRoot {
+    pub id: String,
+    pub label: String,
+    pub path: String,
+    pub exists: bool,
+    pub file_count: usize,
+    pub total_bytes: u64,
+    pub modified_at: Option<DateTime<Utc>>,
+    pub sessions: Vec<AgentSessionEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSessionInfo {
+    pub agent: String,
+    pub detected: bool,
+    pub roots: Vec<AgentSessionRoot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSessionSyncResult {
+    pub source_agent: String,
+    pub source_root_id: String,
+    pub target_agent: String,
+    pub target_path: Option<String>,
+    pub copied_files: usize,
+    pub skipped_files: usize,
+    pub status: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AgentSessionSyncSummary {
+    pub total: usize,
+    pub copied: usize,
+    pub skipped: usize,
+    pub failed: usize,
+    pub results: Vec<AgentSessionSyncResult>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

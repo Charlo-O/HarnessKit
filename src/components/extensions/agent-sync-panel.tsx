@@ -41,7 +41,7 @@ function toggleSetValue<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
-export function IdeSyncPanel() {
+export function AgentSyncPanel() {
   const { t } = useTranslation("extensions");
   const extensions = useExtensionStore((s) => s.extensions);
   const fetchExtensions = useExtensionStore((s) => s.fetch);
@@ -177,13 +177,15 @@ export function IdeSyncPanel() {
       await fetchAgents();
       if (result.failed > 0) {
         toast.error(
-          t("ideSync.toastPartial", {
+          t("agentSync.toastPartial", {
             deployed: result.deployed,
             failed: result.failed,
           }),
         );
       } else {
-        toast.success(t("ideSync.toastSuccess", { deployed: result.deployed }));
+        toast.success(
+          t("agentSync.toastSuccess", { deployed: result.deployed }),
+        );
       }
     } catch (e) {
       const message = humanizeError(e);
@@ -200,10 +202,10 @@ export function IdeSyncPanel() {
         <div className="min-w-0">
           <h3 className="flex items-center gap-2 text-sm font-semibold">
             <RefreshCw size={14} />
-            {t("ideSync.title")}
+            {t("agentSync.title")}
           </h3>
           <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
-            {t("ideSync.desc")}
+            {t("agentSync.desc")}
           </p>
         </div>
         <button
@@ -214,12 +216,12 @@ export function IdeSyncPanel() {
           {syncing ? (
             <>
               <Loader2 size={12} className="animate-spin" />
-              {t("ideSync.syncing")}
+              {t("agentSync.syncing")}
             </>
           ) : (
             <>
               <RotateCcw size={12} />
-              {t("ideSync.syncNow", { count: plannedCount })}
+              {t("agentSync.syncNow", { count: plannedCount })}
             </>
           )}
         </button>
@@ -229,7 +231,7 @@ export function IdeSyncPanel() {
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-medium text-muted-foreground">
-              {t("ideSync.items", {
+              {t("agentSync.items", {
                 selected: visibleGroups.filter((group) =>
                   selectedItems.has(group.groupKey),
                 ).length,
@@ -241,13 +243,13 @@ export function IdeSyncPanel() {
                 onClick={handleSelectVisible}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                {t("ideSync.selectAll")}
+                {t("agentSync.selectAll")}
               </button>
               <button
                 onClick={handleClearVisible}
                 className="text-xs text-muted-foreground hover:text-foreground"
               >
-                {t("ideSync.clear")}
+                {t("agentSync.clear")}
               </button>
             </div>
           </div>
@@ -255,7 +257,7 @@ export function IdeSyncPanel() {
           <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
             {visibleGroups.length === 0 ? (
               <div className="p-4 text-sm text-muted-foreground">
-                {t("ideSync.noItems")}
+                {t("agentSync.noItems")}
               </div>
             ) : (
               visibleGroups.map((group) => {
@@ -296,7 +298,7 @@ export function IdeSyncPanel() {
                         ))}
                         {missingTargets.length > 0 && checked && (
                           <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
-                            {t("ideSync.pendingTargets", {
+                            {t("agentSync.pendingTargets", {
                               count: missingTargets.length,
                             })}
                           </span>
@@ -313,7 +315,7 @@ export function IdeSyncPanel() {
         <aside className="space-y-4 lg:border-border lg:border-l lg:pl-4">
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">
-              {t("ideSync.include")}
+              {t("agentSync.include")}
             </p>
             <div className="space-y-2">
               {SYNC_KINDS.map((kind) => (
@@ -321,7 +323,7 @@ export function IdeSyncPanel() {
                   key={kind}
                   className="flex items-center justify-between gap-3 text-sm"
                 >
-                  <span>{t(`ideSync.kinds.${kind}`)}</span>
+                  <span>{t(`agentSync.kinds.${kind}`)}</span>
                   <input
                     type="checkbox"
                     checked={selectedKinds.has(kind)}
@@ -339,12 +341,12 @@ export function IdeSyncPanel() {
 
           <div>
             <p className="mb-2 text-xs font-medium text-muted-foreground">
-              {t("ideSync.targets")}
+              {t("agentSync.targets")}
             </p>
             <div className="space-y-2">
               {targetAgents.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  {t("ideSync.noTargets")}
+                  {t("agentSync.noTargets")}
                 </p>
               ) : (
                 targetAgents.map((agent) => (
@@ -375,12 +377,12 @@ export function IdeSyncPanel() {
             <div className="flex items-center gap-2 font-medium">
               <CheckCircle2 size={13} />
               {plannedCount > 0
-                ? t("ideSync.ready", { count: plannedCount })
-                : t("ideSync.noPending")}
+                ? t("agentSync.ready", { count: plannedCount })
+                : t("agentSync.noPending")}
             </div>
             {summary && (
               <p className="mt-2 text-muted-foreground">
-                {t("ideSync.summary", {
+                {t("agentSync.summary", {
                   deployed: summary.deployed,
                   skipped: summary.skipped,
                   failed: summary.failed,
@@ -394,7 +396,7 @@ export function IdeSyncPanel() {
           {failedResults.length > 0 && (
             <div className="space-y-1 text-xs">
               <p className="font-medium text-destructive">
-                {t("ideSync.failedTitle")}
+                {t("agentSync.failedTitle")}
               </p>
               {failedResults.slice(0, 4).map((result) => (
                 <p

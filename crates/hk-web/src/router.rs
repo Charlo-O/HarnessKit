@@ -1,15 +1,14 @@
 use axum::{
-    Router,
+    Json, Router,
     body::Body,
-    middleware,
-    routing::{get, post},
-    response::{Html, IntoResponse},
     http::{Method, StatusCode, Uri, header},
-    Json,
+    middleware,
+    response::{Html, IntoResponse},
+    routing::{get, post},
 };
 use hk_core::HkError;
 use rust_embed::RustEmbed;
-use tower_http::cors::{CorsLayer, Any};
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::auth::require_token;
 use crate::handlers;
@@ -74,68 +73,205 @@ pub fn build_router(state: WebState) -> Router {
         // Health
         .route("/api/health", get(health))
         // Extensions
-        .route("/api/list_extensions", post(handlers::extensions::list_extensions))
-        .route("/api/toggle_extension", post(handlers::extensions::toggle_extension))
-        .route("/api/delete_extension", post(handlers::extensions::delete_extension))
-        .route("/api/get_extension_content", post(handlers::extensions::get_extension_content))
-        .route("/api/scan_and_sync", post(handlers::extensions::scan_and_sync))
-        .route("/api/uninstall_cli_binary", post(handlers::extensions::uninstall_cli_binary))
-        .route("/api/list_skill_files", post(handlers::extensions::list_skill_files))
+        .route(
+            "/api/list_extensions",
+            post(handlers::extensions::list_extensions),
+        )
+        .route(
+            "/api/toggle_extension",
+            post(handlers::extensions::toggle_extension),
+        )
+        .route(
+            "/api/delete_extension",
+            post(handlers::extensions::delete_extension),
+        )
+        .route(
+            "/api/get_extension_content",
+            post(handlers::extensions::get_extension_content),
+        )
+        .route(
+            "/api/scan_and_sync",
+            post(handlers::extensions::scan_and_sync),
+        )
+        .route(
+            "/api/uninstall_cli_binary",
+            post(handlers::extensions::uninstall_cli_binary),
+        )
+        .route(
+            "/api/list_skill_files",
+            post(handlers::extensions::list_skill_files),
+        )
         // Settings / Dashboard
-        .route("/api/get_dashboard_stats", post(handlers::settings::get_dashboard_stats))
+        .route(
+            "/api/get_dashboard_stats",
+            post(handlers::settings::get_dashboard_stats),
+        )
         .route("/api/update_tags", post(handlers::settings::update_tags))
-        .route("/api/batch_update_tags", post(handlers::settings::batch_update_tags))
+        .route(
+            "/api/batch_update_tags",
+            post(handlers::settings::batch_update_tags),
+        )
         .route("/api/get_all_tags", post(handlers::settings::get_all_tags))
         .route("/api/update_pack", post(handlers::settings::update_pack))
-        .route("/api/batch_update_pack", post(handlers::settings::batch_update_pack))
-        .route("/api/get_all_packs", post(handlers::settings::get_all_packs))
-        .route("/api/toggle_by_pack", post(handlers::settings::toggle_by_pack))
-        .route("/api/read_config_file_preview", post(handlers::settings::read_config_file_preview))
+        .route(
+            "/api/batch_update_pack",
+            post(handlers::settings::batch_update_pack),
+        )
+        .route(
+            "/api/get_all_packs",
+            post(handlers::settings::get_all_packs),
+        )
+        .route(
+            "/api/toggle_by_pack",
+            post(handlers::settings::toggle_by_pack),
+        )
+        .route(
+            "/api/read_config_file_preview",
+            post(handlers::settings::read_config_file_preview),
+        )
         // Sync
-        .route("/api/sync_get_config", post(handlers::sync::sync_get_config))
+        .route(
+            "/api/sync_get_config",
+            post(handlers::sync::sync_get_config),
+        )
         .route("/api/sync_has_token", post(handlers::sync::sync_has_token))
-        .route("/api/sync_save_config", post(handlers::sync::sync_save_config))
-        .route("/api/sync_test_connection", post(handlers::sync::sync_test_connection))
+        .route(
+            "/api/sync_save_config",
+            post(handlers::sync::sync_save_config),
+        )
+        .route(
+            "/api/sync_test_connection",
+            post(handlers::sync::sync_test_connection),
+        )
         .route("/api/sync_push", post(handlers::sync::sync_push))
         .route("/api/sync_pull", post(handlers::sync::sync_pull))
         .route("/api/sync_to_agents", post(handlers::sync::sync_to_agents))
+        .route(
+            "/api/list_agent_sessions",
+            post(handlers::sync::list_agent_sessions),
+        )
+        .route(
+            "/api/sync_agent_sessions",
+            post(handlers::sync::sync_agent_sessions),
+        )
         // Agents
         .route("/api/list_agents", post(handlers::agents::list_agents))
-        .route("/api/set_agent_enabled", post(handlers::agents::set_agent_enabled))
-        .route("/api/update_agent_order", post(handlers::agents::update_agent_order))
-        .route("/api/update_agent_path", post(handlers::agents::update_agent_path))
-        .route("/api/list_agent_configs", post(handlers::agents::list_agent_configs))
-        .route("/api/add_custom_config_path", post(handlers::agents::add_custom_config_path))
-        .route("/api/update_custom_config_path", post(handlers::agents::update_custom_config_path))
-        .route("/api/remove_custom_config_path", post(handlers::agents::remove_custom_config_path))
+        .route(
+            "/api/set_agent_enabled",
+            post(handlers::agents::set_agent_enabled),
+        )
+        .route(
+            "/api/update_agent_order",
+            post(handlers::agents::update_agent_order),
+        )
+        .route(
+            "/api/update_agent_path",
+            post(handlers::agents::update_agent_path),
+        )
+        .route(
+            "/api/list_agent_configs",
+            post(handlers::agents::list_agent_configs),
+        )
+        .route(
+            "/api/add_custom_config_path",
+            post(handlers::agents::add_custom_config_path),
+        )
+        .route(
+            "/api/update_custom_config_path",
+            post(handlers::agents::update_custom_config_path),
+        )
+        .route(
+            "/api/remove_custom_config_path",
+            post(handlers::agents::remove_custom_config_path),
+        )
         // Audit
-        .route("/api/list_audit_results", post(handlers::audit::list_audit_results))
+        .route(
+            "/api/list_audit_results",
+            post(handlers::audit::list_audit_results),
+        )
         .route("/api/run_audit", post(handlers::audit::run_audit))
         // Projects
-        .route("/api/list_projects", post(handlers::projects::list_projects))
+        .route(
+            "/api/list_projects",
+            post(handlers::projects::list_projects),
+        )
         .route("/api/add_project", post(handlers::projects::add_project))
-        .route("/api/remove_project", post(handlers::projects::remove_project))
-        .route("/api/discover_projects", post(handlers::projects::discover_projects))
+        .route(
+            "/api/remove_project",
+            post(handlers::projects::remove_project),
+        )
+        .route(
+            "/api/discover_projects",
+            post(handlers::projects::discover_projects),
+        )
         // Marketplace
-        .route("/api/search_marketplace", post(handlers::marketplace::search_marketplace))
-        .route("/api/trending_marketplace", post(handlers::marketplace::trending_marketplace))
-        .route("/api/list_cli_marketplace", post(handlers::marketplace::list_cli_marketplace))
-        .route("/api/fetch_skill_preview", post(handlers::marketplace::fetch_skill_preview))
-        .route("/api/fetch_cli_readme", post(handlers::marketplace::fetch_cli_readme))
-        .route("/api/fetch_skill_audit", post(handlers::marketplace::fetch_skill_audit))
+        .route(
+            "/api/search_marketplace",
+            post(handlers::marketplace::search_marketplace),
+        )
+        .route(
+            "/api/trending_marketplace",
+            post(handlers::marketplace::trending_marketplace),
+        )
+        .route(
+            "/api/list_cli_marketplace",
+            post(handlers::marketplace::list_cli_marketplace),
+        )
+        .route(
+            "/api/fetch_skill_preview",
+            post(handlers::marketplace::fetch_skill_preview),
+        )
+        .route(
+            "/api/fetch_cli_readme",
+            post(handlers::marketplace::fetch_cli_readme),
+        )
+        .route(
+            "/api/fetch_skill_audit",
+            post(handlers::marketplace::fetch_skill_audit),
+        )
         // Install
         .route("/api/scan_git_repo", post(handlers::install::scan_git_repo))
-        .route("/api/install_scanned_skills", post(handlers::install::install_scanned_skills))
-        .route("/api/install_new_repo_skills", post(handlers::install::install_new_repo_skills))
-        .route("/api/install_from_git", post(handlers::install::install_from_git))
-        .route("/api/install_from_marketplace", post(handlers::install::install_from_marketplace))
-        .route("/api/install_from_local", post(handlers::install::install_from_local))
-        .route("/api/install_to_agent", post(handlers::install::install_to_agent))
-        .route("/api/update_extension", post(handlers::install::update_extension))
+        .route(
+            "/api/install_scanned_skills",
+            post(handlers::install::install_scanned_skills),
+        )
+        .route(
+            "/api/install_new_repo_skills",
+            post(handlers::install::install_new_repo_skills),
+        )
+        .route(
+            "/api/install_from_git",
+            post(handlers::install::install_from_git),
+        )
+        .route(
+            "/api/install_from_marketplace",
+            post(handlers::install::install_from_marketplace),
+        )
+        .route(
+            "/api/install_from_local",
+            post(handlers::install::install_from_local),
+        )
+        .route(
+            "/api/install_to_agent",
+            post(handlers::install::install_to_agent),
+        )
+        .route(
+            "/api/update_extension",
+            post(handlers::install::update_extension),
+        )
         .route("/api/check_updates", post(handlers::install::check_updates))
-        .route("/api/get_cached_update_statuses", post(handlers::install::get_cached_update_statuses))
-        .route("/api/get_cli_with_children", post(handlers::install::get_cli_with_children))
-        .route("/api/get_skill_locations", post(handlers::install::get_skill_locations));
+        .route(
+            "/api/get_cached_update_statuses",
+            post(handlers::install::get_cached_update_statuses),
+        )
+        .route(
+            "/api/get_cli_with_children",
+            post(handlers::install::get_cli_with_children),
+        )
+        .route(
+            "/api/get_skill_locations",
+            post(handlers::install::get_skill_locations),
+        );
 
     let cors = CorsLayer::new()
         .allow_origin(Any)

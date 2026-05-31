@@ -7,7 +7,14 @@ use crate::{
     scanner,
     store::Store,
 };
+use chrono::{DateTime, Utc};
 use parking_lot::Mutex;
+use serde_json::Value;
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 /// Compare two filesystem paths, resolving symlinks where possible so that
 /// e.g. `~/.gemini/antigravity/skills` (symlink) and `~/.claude/skills`
@@ -158,12 +165,8 @@ pub fn post_install_sync(
                     extensions.extend(exts);
                 }
             }
-            let sibling_id = scanner::stable_id_with_scope_for(
-                skill_name,
-                "skill",
-                &sibling_name,
-                target_scope,
-            );
+            let sibling_id =
+                scanner::stable_id_with_scope_for(skill_name, "skill", &sibling_name, target_scope);
             let _ = store.set_install_meta(&sibling_id, meta);
             if let Some(p) = pack {
                 let _ = store.update_pack(&sibling_id, Some(p));
@@ -1008,7 +1011,11 @@ fn plugin_deploy_root(
         })?;
 
     match target_adapter.name() {
-        "codex" => Ok(base_dir.join("cache").join("local").join(name).join("0.0.0")),
+        "codex" => Ok(base_dir
+            .join("cache")
+            .join("local")
+            .join(name)
+            .join("0.0.0")),
         "cursor" => Ok(base_dir.join("local").join(name)),
         "gemini" => Ok(base_dir.join(name)),
         "claude" => Ok(base_dir.join("local").join(name)),
@@ -1106,11 +1113,9 @@ fn ensure_plugin_visible(
             &ext.name,
             None,
         ),
-        "gemini" => write_manifest_if_missing(
-            &target_root.join("gemini-extension.json"),
-            &ext.name,
-            None,
-        ),
+        "gemini" => {
+            write_manifest_if_missing(&target_root.join("gemini-extension.json"), &ext.name, None)
+        }
         "copilot" => write_manifest_if_missing(&target_root.join("plugin.json"), &ext.name, None),
         "claude" => {
             write_manifest_if_missing(
@@ -1359,7 +1364,7 @@ pub fn sync_to_agents(
                     kind: ext.kind,
                     target_agent: target_agent.clone(),
                     status: "skipped".into(),
-                    message: format!("{} cannot be synced to IDEs", ext.kind.as_str()),
+                    message: format!("{} cannot be synced to agents", ext.kind.as_str()),
                 });
             }
             continue;
@@ -1413,6 +1418,794 @@ pub fn sync_to_agents(
         let projects = store.list_project_tuples();
         let scanned = scanner::scan_all(adapters, &projects);
         store.sync_extensions(&scanned)?;
+    }
+
+    Ok(summary)
+}
+
+struct SessionRootCandidate {
+    id: &'static str,
+    label: &'static str,
+    path: PathBuf,
+}
+
+fn app_support_dir(home: &Path, app_name: &str) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        home.join("AppData").join("Roaming").join(app_name)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        home.join("Library")
+            .join("Application Support")
+            .join(app_name)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        home.join(".config").join(app_name)
+    }
+}
+
+fn local_app_data_dir(home: &Path, app_name: &str) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        home.join("AppData").join("Local").join(app_name)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        home.join("Library")
+            .join("Application Support")
+            .join(app_name)
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        home.join(".local").join("share").join(app_name)
+    }
+}
+
+fn session_root_candidates(adapter: &dyn AgentAdapter) -> Vec<SessionRootCandidate> {
+    let home = dirs::home_dir().unwrap_or_default();
+    let base = adapter.base_dir();
+    match adapter.name() {
+        "claude" => vec![
+            SessionRootCandidate {
+                id: "sessions",
+                label: "Sessions",
+                path: base.join("sessions"),
+            },
+            SessionRootCandidate {
+                id: "projects",
+                label: "Project transcripts",
+                path: base.join("projects"),
+            },
+            SessionRootCandidate {
+                id: "transcripts",
+                label: "Transcripts",
+                path: base.join("transcripts"),
+            },
+        ],
+        "codex" => vec![
+            SessionRootCandidate {
+                id: "sessions",
+                label: "Sessions",
+                path: base.join("sessions"),
+            },
+            SessionRootCandidate {
+                id: "archived_sessions",
+                label: "Archived sessions",
+                path: base.join("archived_sessions"),
+            },
+        ],
+        "gemini" => vec![SessionRootCandidate {
+            id: "tmp",
+            label: "Temporary sessions",
+            path: base.join("tmp"),
+        }],
+        "antigravity" => vec![SessionRootCandidate {
+            id: "conversations",
+            label: "Conversations",
+            path: base.join("conversations"),
+        }],
+        "cursor" => vec![
+            SessionRootCandidate {
+                id: "workspace_storage",
+                label: "Workspace storage",
+                path: app_support_dir(&home, "Cursor")
+                    .join("User")
+                    .join("workspaceStorage"),
+            },
+            SessionRootCandidate {
+                id: "dot_cursor_sessions",
+                label: "Sessions",
+                path: base.join("sessions"),
+            },
+        ],
+        "windsurf" => vec![
+            SessionRootCandidate {
+                id: "workspace_storage",
+                label: "Workspace storage",
+                path: app_support_dir(&home, "Windsurf")
+                    .join("User")
+                    .join("workspaceStorage"),
+            },
+            SessionRootCandidate {
+                id: "conversations",
+                label: "Conversations",
+                path: base.join("conversations"),
+            },
+        ],
+        "copilot" => {
+            let mut roots = vec![SessionRootCandidate {
+                id: "sessions",
+                label: "Sessions",
+                path: base.join("sessions"),
+            }];
+            if let Some(vscode_user_dir) = adapter.vscode_user_dir() {
+                roots.push(SessionRootCandidate {
+                    id: "vscode_workspace_storage",
+                    label: "VS Code workspace storage",
+                    path: vscode_user_dir.join("workspaceStorage"),
+                });
+            }
+            roots
+        }
+        "opencode" => vec![
+            SessionRootCandidate {
+                id: "sessions",
+                label: "Sessions",
+                path: base.join("sessions"),
+            },
+            SessionRootCandidate {
+                id: "desktop_data",
+                label: "Desktop data",
+                path: app_support_dir(&home, "OpenCode"),
+            },
+            SessionRootCandidate {
+                id: "desktop_local_data",
+                label: "Desktop local data",
+                path: local_app_data_dir(&home, "OpenCode"),
+            },
+            SessionRootCandidate {
+                id: "desktop_bundle_data",
+                label: "Desktop bundle data",
+                path: app_support_dir(&home, "ai.opencode.desktop"),
+            },
+        ],
+        _ => vec![SessionRootCandidate {
+            id: "sessions",
+            label: "Sessions",
+            path: base.join("sessions"),
+        }],
+    }
+}
+
+const SESSION_SUMMARY_READ_LIMIT: u64 = 256 * 1024;
+const SESSION_SUMMARY_LINE_LIMIT: usize = 120;
+const SESSION_SUMMARY_MAX_CHARS: usize = 140;
+
+fn truncate_session_summary(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.chars().count() <= SESSION_SUMMARY_MAX_CHARS {
+        return trimmed.to_string();
+    }
+    let keep = SESSION_SUMMARY_MAX_CHARS.saturating_sub(3);
+    let mut summary = trimmed.chars().take(keep).collect::<String>();
+    summary.push_str("...");
+    summary
+}
+
+fn strip_markup_tags(value: &str) -> String {
+    let mut output = String::with_capacity(value.len());
+    let mut in_tag = false;
+    for ch in value.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' if in_tag => in_tag = false,
+            _ if !in_tag => output.push(ch),
+            _ => {}
+        }
+    }
+    output
+}
+
+fn normalize_session_text(value: &str) -> Option<String> {
+    let without_tags = strip_markup_tags(value);
+    let collapsed = without_tags
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let collapsed = collapsed.trim_matches(['"', '\'']).trim();
+    if collapsed.len() < 2 {
+        return None;
+    }
+    if collapsed.starts_with("<environment_context>") {
+        return None;
+    }
+    Some(truncate_session_summary(collapsed))
+}
+
+fn json_string(value: &Value, key: &str) -> Option<String> {
+    value.get(key).and_then(json_text)
+}
+
+fn json_text(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => normalize_session_text(text),
+        Value::Array(items) => {
+            let parts = items
+                .iter()
+                .take(8)
+                .filter_map(json_text)
+                .collect::<Vec<_>>();
+            if parts.is_empty() {
+                None
+            } else {
+                normalize_session_text(&parts.join(" "))
+            }
+        }
+        Value::Object(map) => {
+            for key in ["text", "message", "content", "input", "prompt"] {
+                if let Some(text) = map.get(key).and_then(json_text) {
+                    return Some(text);
+                }
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn is_user_message(value: &Value) -> bool {
+    ["role", "type", "speaker", "kind"].iter().any(|key| {
+        value.get(key).and_then(Value::as_str).is_some_and(|role| {
+            role.eq_ignore_ascii_case("user") || role.eq_ignore_ascii_case("human")
+        })
+    })
+}
+
+fn session_summary_from_json(value: &Value) -> Option<String> {
+    match value {
+        Value::Object(map) => {
+            for key in ["firstPrompt", "title", "summary", "name"] {
+                if let Some(text) = map.get(key).and_then(json_text) {
+                    return Some(text);
+                }
+            }
+
+            if is_user_message(value) {
+                for key in ["message", "content", "text", "input", "prompt"] {
+                    if let Some(text) = json_string(value, key) {
+                        return Some(text);
+                    }
+                }
+            }
+
+            for key in ["entries", "messages", "turns", "items"] {
+                if let Some(Value::Array(items)) = map.get(key) {
+                    for item in items.iter().take(80).filter(|item| is_user_message(item)) {
+                        if let Some(text) = session_summary_from_json(item) {
+                            return Some(text);
+                        }
+                    }
+                    for item in items.iter().take(40) {
+                        if let Some(text) = session_summary_from_json(item) {
+                            return Some(text);
+                        }
+                    }
+                }
+            }
+
+            for key in ["payload", "message", "data", "session"] {
+                if let Some(text) = map.get(key).and_then(session_summary_from_json) {
+                    return Some(text);
+                }
+            }
+
+            None
+        }
+        Value::Array(items) => {
+            for item in items.iter().take(80).filter(|item| is_user_message(item)) {
+                if let Some(text) = session_summary_from_json(item) {
+                    return Some(text);
+                }
+            }
+            for item in items.iter().take(40) {
+                if let Some(text) = session_summary_from_json(item) {
+                    return Some(text);
+                }
+            }
+            None
+        }
+        _ => json_text(value),
+    }
+}
+
+fn is_text_session_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            matches!(
+                ext.to_ascii_lowercase().as_str(),
+                "json" | "jsonl" | "log" | "txt" | "md" | "yaml" | "yml"
+            )
+        })
+        .unwrap_or(false)
+}
+
+fn read_text_prefix(path: &Path) -> Option<String> {
+    let mut file = File::open(path).ok()?;
+    let mut bytes = Vec::new();
+    file.by_ref()
+        .take(SESSION_SUMMARY_READ_LIMIT)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+fn parse_json_string(value: &str) -> Option<String> {
+    let mut chars = value.chars();
+    if chars.next()? != '"' {
+        return None;
+    }
+
+    let mut out = String::new();
+    let mut escaped = false;
+    for ch in chars {
+        if escaped {
+            match ch {
+                '"' => out.push('"'),
+                '\\' => out.push('\\'),
+                '/' => out.push('/'),
+                'n' => out.push('\n'),
+                'r' => out.push('\r'),
+                't' => out.push('\t'),
+                other => out.push(other),
+            }
+            escaped = false;
+            continue;
+        }
+        match ch {
+            '\\' => escaped = true,
+            '"' => return normalize_session_text(&out),
+            other => out.push(other),
+        }
+    }
+    None
+}
+
+fn extract_json_stringish(text: &str, key: &str) -> Option<String> {
+    let pattern = format!("\"{key}\"");
+    let mut offset = 0usize;
+    while let Some(pos) = text[offset..].find(&pattern) {
+        let start = offset + pos + pattern.len();
+        let after_key = &text[start..];
+        let colon = after_key.find(':')?;
+        let value = after_key[colon + 1..].trim_start();
+        if let Some(text) = parse_json_string(value) {
+            return Some(text);
+        }
+        offset = start;
+    }
+    None
+}
+
+fn session_summary_from_file(path: &Path) -> Option<String> {
+    if !is_text_session_file(path) {
+        return None;
+    }
+    let text = read_text_prefix(path)?;
+
+    for line in text.lines().take(SESSION_SUMMARY_LINE_LIMIT) {
+        if let Ok(value) = serde_json::from_str::<Value>(line) {
+            if let Some(summary) = session_summary_from_json(&value) {
+                return Some(summary);
+            }
+        }
+    }
+
+    if let Ok(value) = serde_json::from_str::<Value>(&text) {
+        if let Some(summary) = session_summary_from_json(&value) {
+            return Some(summary);
+        }
+    }
+
+    for key in [
+        "firstPrompt",
+        "title",
+        "summary",
+        "message",
+        "content",
+        "text",
+    ] {
+        if let Some(summary) = extract_json_stringish(&text, key) {
+            return Some(summary);
+        }
+    }
+
+    None
+}
+
+fn fallback_session_summary(path: &Path, relative_path: &str) -> String {
+    let label = path
+        .file_stem()
+        .and_then(|file_name| file_name.to_str())
+        .filter(|file_name| !file_name.is_empty())
+        .unwrap_or(relative_path);
+    let readable = label
+        .chars()
+        .map(|ch| if ch == '_' || ch == '-' { ' ' } else { ch })
+        .collect::<String>();
+    truncate_session_summary(&readable)
+}
+
+fn session_entry_from_file(
+    root_path: &Path,
+    root_id: &str,
+    root_label: &str,
+    path: &Path,
+    meta: &std::fs::Metadata,
+) -> AgentSessionEntry {
+    let relative_path = path
+        .strip_prefix(root_path)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let file_name = path
+        .file_name()
+        .map(|file_name| file_name.to_string_lossy().to_string())
+        .unwrap_or_else(|| relative_path.clone());
+    let modified_at = meta.modified().ok().map(Into::into);
+    let summary = session_summary_from_file(path)
+        .unwrap_or_else(|| fallback_session_summary(path, &relative_path));
+
+    AgentSessionEntry {
+        id: format!("{root_id}:{relative_path}"),
+        summary,
+        path: path.to_string_lossy().to_string(),
+        file_name,
+        relative_path,
+        root_id: root_id.into(),
+        root_label: root_label.into(),
+        total_bytes: meta.len(),
+        modified_at,
+    }
+}
+
+fn is_session_entry_file(path: &Path) -> bool {
+    let file_name = path
+        .file_name()
+        .and_then(|file_name| file_name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if file_name == "sessions-index.json"
+        || file_name.ends_with(".meta.json")
+        || file_name == "memory.md"
+        || file_name == ".window-state.json"
+        || file_name.contains("settings")
+        || file_name.contains("global")
+    {
+        return false;
+    }
+
+    true
+}
+
+fn session_root_stats(candidate: SessionRootCandidate) -> AgentSessionRoot {
+    let mut file_count = 0usize;
+    let mut total_bytes = 0u64;
+    let mut modified_at: Option<DateTime<Utc>> = None;
+    let mut sessions = Vec::new();
+    let exists = candidate.path.exists();
+    let root_id = candidate.id.to_string();
+    let root_label = candidate.label.to_string();
+
+    if exists {
+        for entry in walkdir::WalkDir::new(&candidate.path)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            file_count += 1;
+            if let Ok(meta) = entry.metadata() {
+                total_bytes = total_bytes.saturating_add(meta.len());
+                if let Ok(modified) = meta.modified() {
+                    let modified: DateTime<Utc> = modified.into();
+                    if modified_at.is_none_or(|current| modified > current) {
+                        modified_at = Some(modified);
+                    }
+                }
+                if is_session_entry_file(entry.path()) {
+                    sessions.push(session_entry_from_file(
+                        &candidate.path,
+                        &root_id,
+                        &root_label,
+                        entry.path(),
+                        &meta,
+                    ));
+                }
+            }
+        }
+    }
+    sessions.sort_by(|a, b| {
+        b.modified_at
+            .cmp(&a.modified_at)
+            .then_with(|| a.summary.cmp(&b.summary))
+    });
+
+    AgentSessionRoot {
+        id: root_id,
+        label: root_label,
+        path: candidate.path.to_string_lossy().to_string(),
+        exists,
+        file_count,
+        total_bytes,
+        modified_at,
+        sessions,
+    }
+}
+
+pub fn list_agent_sessions(adapters: &[Box<dyn AgentAdapter>]) -> Vec<AgentSessionInfo> {
+    adapters
+        .iter()
+        .map(|adapter| AgentSessionInfo {
+            agent: adapter.name().into(),
+            detected: adapter.detect(),
+            roots: session_root_candidates(adapter.as_ref())
+                .into_iter()
+                .map(session_root_stats)
+                .collect(),
+        })
+        .collect()
+}
+
+fn find_session_root(
+    adapter: &dyn AgentAdapter,
+    root_id: Option<&str>,
+) -> Result<SessionRootCandidate, HkError> {
+    let candidates = session_root_candidates(adapter);
+    if let Some(root_id) = root_id {
+        return candidates
+            .into_iter()
+            .find(|root| root.id == root_id)
+            .ok_or_else(|| HkError::NotFound(format!("Session root '{root_id}' not found")));
+    }
+    candidates
+        .into_iter()
+        .next()
+        .ok_or_else(|| HkError::NotFound("No session root available".into()))
+}
+
+fn timestamp_slug() -> String {
+    Utc::now().format("%Y%m%d-%H%M%S").to_string()
+}
+
+fn unique_file_path(path: &Path) -> PathBuf {
+    if !path.exists() {
+        return path.to_path_buf();
+    }
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "session".into());
+    let ext = path.extension().map(|e| e.to_string_lossy().to_string());
+    for index in 1..10_000 {
+        let file_name = match &ext {
+            Some(ext) => format!("{stem}.hkcopy-{index}.{ext}"),
+            None => format!("{stem}.hkcopy-{index}"),
+        };
+        let candidate = parent.join(file_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    path.to_path_buf()
+}
+
+fn copy_session_tree(source: &Path, destination: &Path) -> Result<(usize, usize), HkError> {
+    if !source.exists() {
+        return Err(HkError::NotFound(format!(
+            "Session source '{}' does not exist",
+            source.display()
+        )));
+    }
+    if destination.starts_with(source) {
+        return Err(HkError::Validation(
+            "Session destination cannot be inside the source folder".into(),
+        ));
+    }
+    std::fs::create_dir_all(destination)?;
+
+    let mut copied = 0usize;
+    let mut skipped = 0usize;
+
+    for entry in walkdir::WalkDir::new(source)
+        .follow_links(false)
+        .into_iter()
+        .filter_map(Result::ok)
+    {
+        let path = entry.path();
+        if path == source {
+            continue;
+        }
+        let relative = path
+            .strip_prefix(source)
+            .map_err(|e| HkError::Internal(e.to_string()))?;
+        let target = destination.join(relative);
+
+        if entry.file_type().is_symlink() {
+            skipped += 1;
+            continue;
+        }
+        if entry.file_type().is_dir() {
+            std::fs::create_dir_all(&target)?;
+            continue;
+        }
+        if !entry.file_type().is_file() {
+            skipped += 1;
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let target = unique_file_path(&target);
+        std::fs::copy(path, target)?;
+        copied += 1;
+    }
+
+    Ok((copied, skipped))
+}
+
+fn copy_single_session_file(
+    source_root: &Path,
+    source_file: &Path,
+    destination: &Path,
+) -> Result<(usize, usize), HkError> {
+    if !source_file.exists() || !source_file.is_file() {
+        return Err(HkError::NotFound(format!(
+            "Session file '{}' does not exist",
+            source_file.display()
+        )));
+    }
+
+    let canonical_root = std::fs::canonicalize(source_root)?;
+    let canonical_source = std::fs::canonicalize(source_file)?;
+    if !canonical_source.starts_with(&canonical_root) {
+        return Err(HkError::Validation(
+            "Session file must belong to the selected source folder".into(),
+        ));
+    }
+
+    let relative = canonical_source
+        .strip_prefix(&canonical_root)
+        .map_err(|e| HkError::Internal(e.to_string()))?;
+    let target = destination.join(relative);
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let target = unique_file_path(&target);
+    std::fs::copy(&canonical_source, target)?;
+    Ok((1, 0))
+}
+
+pub fn sync_agent_sessions(
+    adapters: &[Box<dyn AgentAdapter>],
+    source_agent: &str,
+    source_root_id: &str,
+    target_agents: &[String],
+    source_session_path: Option<&str>,
+) -> Result<AgentSessionSyncSummary, HkError> {
+    let source_adapter = adapters
+        .iter()
+        .find(|adapter| adapter.name() == source_agent)
+        .ok_or_else(|| HkError::NotFound(format!("Agent '{source_agent}' not found")))?;
+    let source_root = find_session_root(source_adapter.as_ref(), Some(source_root_id))?;
+    let source_path = source_root.path.clone();
+    if !source_path.exists() {
+        return Err(HkError::NotFound(format!(
+            "Session source '{}' does not exist",
+            source_path.display()
+        )));
+    }
+
+    let mut summary = AgentSessionSyncSummary::default();
+
+    for target_agent in target_agents {
+        summary.total += 1;
+        if target_agent == source_agent {
+            summary.skipped += 1;
+            summary.results.push(AgentSessionSyncResult {
+                source_agent: source_agent.into(),
+                source_root_id: source_root_id.into(),
+                target_agent: target_agent.clone(),
+                target_path: None,
+                copied_files: 0,
+                skipped_files: 0,
+                status: "skipped".into(),
+                message: "Source and target are the same".into(),
+            });
+            continue;
+        }
+
+        let Some(target_adapter) = adapters
+            .iter()
+            .find(|adapter| adapter.name() == target_agent)
+        else {
+            summary.failed += 1;
+            summary.results.push(AgentSessionSyncResult {
+                source_agent: source_agent.into(),
+                source_root_id: source_root_id.into(),
+                target_agent: target_agent.clone(),
+                target_path: None,
+                copied_files: 0,
+                skipped_files: 0,
+                status: "failed".into(),
+                message: "Target agent not found".into(),
+            });
+            continue;
+        };
+
+        let target_root = match find_session_root(target_adapter.as_ref(), None) {
+            Ok(root) => root,
+            Err(err) => {
+                summary.failed += 1;
+                summary.results.push(AgentSessionSyncResult {
+                    source_agent: source_agent.into(),
+                    source_root_id: source_root_id.into(),
+                    target_agent: target_agent.clone(),
+                    target_path: None,
+                    copied_files: 0,
+                    skipped_files: 0,
+                    status: "failed".into(),
+                    message: err.to_string(),
+                });
+                continue;
+            }
+        };
+        let destination = target_root.path.join("harnesskit-imports").join(format!(
+            "{source_agent}-{source_root_id}-{}",
+            timestamp_slug()
+        ));
+
+        let copy_result = if let Some(source_session_path) = source_session_path {
+            copy_single_session_file(&source_path, Path::new(source_session_path), &destination)
+        } else {
+            copy_session_tree(&source_path, &destination)
+        };
+
+        match copy_result {
+            Ok((copied_files, skipped_files)) => {
+                summary.copied += copied_files;
+                summary.skipped += skipped_files;
+                summary.results.push(AgentSessionSyncResult {
+                    source_agent: source_agent.into(),
+                    source_root_id: source_root_id.into(),
+                    target_agent: target_agent.clone(),
+                    target_path: Some(destination.to_string_lossy().to_string()),
+                    copied_files,
+                    skipped_files,
+                    status: "copied".into(),
+                    message: format!("Copied {copied_files} file(s)"),
+                });
+            }
+            Err(err) => {
+                summary.failed += 1;
+                summary.results.push(AgentSessionSyncResult {
+                    source_agent: source_agent.into(),
+                    source_root_id: source_root_id.into(),
+                    target_agent: target_agent.clone(),
+                    target_path: Some(destination.to_string_lossy().to_string()),
+                    copied_files: 0,
+                    skipped_files: 0,
+                    status: "failed".into(),
+                    message: err.to_string(),
+                });
+            }
+        }
     }
 
     Ok(summary)
@@ -1584,8 +2377,7 @@ mod tests {
         let antigravity_parent = tmp.path().join("gemini/antigravity");
         std::fs::create_dir_all(&antigravity_parent).unwrap();
         let antigravity_skills = antigravity_parent.join("skills");
-        std::os::unix::fs::symlink(tmp.path().join("claude/skills"), &antigravity_skills)
-            .unwrap();
+        std::os::unix::fs::symlink(tmp.path().join("claude/skills"), &antigravity_skills).unwrap();
         let antigravity_md = antigravity_skills.join("code-review/SKILL.md");
         // Symlinked path should resolve to the same inode as claude_md.
         assert_eq!(
@@ -2118,7 +2910,9 @@ mod tests {
 
         let adapters: Vec<Box<dyn adapter::AgentAdapter>> = vec![
             Box::new(adapter::codex::CodexAdapter::with_home(home.to_path_buf())),
-            Box::new(adapter::gemini::GeminiAdapter::with_home(home.to_path_buf())),
+            Box::new(adapter::gemini::GeminiAdapter::with_home(
+                home.to_path_buf(),
+            )),
         ];
 
         let install_meta = InstallMeta {

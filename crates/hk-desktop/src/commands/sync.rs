@@ -1,5 +1,5 @@
 use super::AppState;
-use hk_core::{models::*, sync, HkError};
+use hk_core::{HkError, models::*, sync};
 use tauri::State;
 
 #[derive(serde::Deserialize)]
@@ -115,6 +115,40 @@ pub async fn sync_to_agents(
     let adapters = state.adapters.clone();
     tauri::async_runtime::spawn_blocking(move || {
         hk_core::service::sync_to_agents(&store, &adapters, &items)
+    })
+    .await
+    .map_err(|e| HkError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn list_agent_sessions(
+    state: State<'_, AppState>,
+) -> Result<Vec<AgentSessionInfo>, HkError> {
+    let adapters = state.adapters.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        Ok(hk_core::service::list_agent_sessions(&adapters))
+    })
+    .await
+    .map_err(|e| HkError::Internal(e.to_string()))?
+}
+
+#[tauri::command]
+pub async fn sync_agent_sessions(
+    state: State<'_, AppState>,
+    source_agent: String,
+    source_root_id: String,
+    target_agents: Vec<String>,
+    source_session_path: Option<String>,
+) -> Result<AgentSessionSyncSummary, HkError> {
+    let adapters = state.adapters.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        hk_core::service::sync_agent_sessions(
+            &adapters,
+            &source_agent,
+            &source_root_id,
+            &target_agents,
+            source_session_path.as_deref(),
+        )
     })
     .await
     .map_err(|e| HkError::Internal(e.to_string()))?

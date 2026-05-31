@@ -105,10 +105,7 @@ impl AgentAdapter for AntigravityAdapter {
     fn project_rules_patterns(&self) -> Vec<String> {
         // `.agents/` is canonical (1.18.4+); `.agent/` kept for backward compat.
         // Source: https://discuss.ai.google.dev/t/new-folder-for-rules/126165
-        vec![
-            ".agents/rules/*.md".into(),
-            ".agent/rules/*.md".into(),
-        ]
+        vec![".agents/rules/*.md".into(), ".agent/rules/*.md".into()]
     }
 
     fn project_settings_patterns(&self) -> Vec<String> {

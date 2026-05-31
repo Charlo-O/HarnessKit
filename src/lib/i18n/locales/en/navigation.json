@@ -3,6 +3,7 @@
   "agents": "Agents",
   "extensions": "Extensions",
   "sync": "Sync",
+  "sessions": "Sessions",
   "audit": "Audit",
   "marketplace": "Marketplace",
   "settings": "Settings"

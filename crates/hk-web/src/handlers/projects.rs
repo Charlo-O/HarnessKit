@@ -1,17 +1,15 @@
-use axum::extract::State;
 use axum::Json;
+use axum::extract::State;
 use hk_core::models::{DiscoveredProject, Project};
 use hk_core::scanner;
 use serde::Deserialize;
 
-use crate::router::{blocking, ApiError};
+use crate::router::{ApiError, blocking};
 use crate::state::WebState;
 
 type Result<T> = std::result::Result<Json<T>, ApiError>;
 
-pub async fn list_projects(
-    State(state): State<WebState>,
-) -> Result<Vec<Project>> {
+pub async fn list_projects(State(state): State<WebState>) -> Result<Vec<Project>> {
     blocking(move || {
         let store = state.store.lock();
         let mut projects = store.list_projects()?;
@@ -19,7 +17,8 @@ pub async fn list_projects(
             p.exists = std::path::Path::new(&p.path).exists();
         }
         Ok(projects)
-    }).await
+    })
+    .await
 }
 
 #[derive(Deserialize)]
@@ -71,7 +70,8 @@ pub async fn add_project(
         };
         store.insert_project(&project)?;
         Ok(project)
-    }).await
+    })
+    .await
 }
 
 #[derive(Deserialize)]
@@ -87,7 +87,8 @@ pub async fn remove_project(
         let store = state.store.lock();
         store.delete_project(&params.id)?;
         Ok(())
-    }).await
+    })
+    .await
 }
 
 #[derive(Deserialize)]
@@ -111,9 +112,11 @@ pub async fn discover_projects(
         }
         if !root.is_dir() {
             return Err(hk_core::HkError::Validation(format!(
-                "Not a directory: {}", params.root_path
+                "Not a directory: {}",
+                params.root_path
             )));
         }
         Ok(scanner::discover_projects(root, 4))
-    }).await
+    })
+    .await
 }
