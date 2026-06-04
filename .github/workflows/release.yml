@@ -59,7 +59,7 @@ jobs:
             --jq '.id')
           echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
 
-  release-desktop:
+  release-desktop-macos:
     needs: create-release
     strategy:
       matrix:
@@ -115,22 +115,21 @@ jobs:
           rm certificate.p12
 
       - name: Build desktop app
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        with:
-          releaseId: ${{ needs.create-release.outputs.release_id }}
-          # Required so tauri-action populates `latest.json`'s `notes` field;
-          # without it the in-app updater shows an empty changelog.
-          releaseBody: ${{ needs.create-release.outputs.changelog }}
-          tauriScript: cargo tauri
-          args: --target ${{ matrix.target }}
+        run: cargo tauri build --target ${{ matrix.target }} --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload desktop app to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            target/${{ matrix.target }}/release/bundle/dmg/*.dmg \
+            --repo "${{ github.repository }}" \
+            --clobber
 
       - name: Build CLI (with embedded web frontend)
         run: |
@@ -142,7 +141,48 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp "target/${{ matrix.target }}/release/hk" "hk-macos-${{ matrix.arch }}"
-          gh release upload "${{ github.ref_name }}" "hk-macos-${{ matrix.arch }}" --clobber
+          gh release upload "${{ github.ref_name }}" "hk-macos-${{ matrix.arch }}" --repo "${{ github.repository }}" --clobber
+
+  release-desktop-windows:
+    needs: create-release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: release-windows-x64
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --locked
+
+      - name: Build desktop app
+        run: cargo tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload desktop app to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            target/release/bundle/nsis/*.exe \
+            target/release/bundle/msi/*.msi \
+            --repo "${{ github.repository }}" \
+            --clobber
 
   release-cli-linux:
     needs: create-release
@@ -183,7 +223,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cp target/x86_64-unknown-linux-musl/release/hk hk-linux-x64
-          gh release upload "${{ github.ref_name }}" hk-linux-x64 --clobber
+          gh release upload "${{ github.ref_name }}" hk-linux-x64 --repo "${{ github.repository }}" --clobber
 
   release-cli-windows:
     needs: create-release
@@ -218,4 +258,20 @@ jobs:
         shell: bash
         run: |
           cp target/release/hk.exe hk-windows-x64.exe
-          gh release upload "${{ github.ref_name }}" hk-windows-x64.exe --clobber
+          gh release upload "${{ github.ref_name }}" hk-windows-x64.exe --repo "${{ github.repository }}" --clobber
+
+  publish-release:
+    needs:
+      - create-release
+      - release-desktop-macos
+      - release-desktop-windows
+      - release-cli-linux
+      - release-cli-windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
